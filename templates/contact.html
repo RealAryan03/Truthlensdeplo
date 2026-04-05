@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Contact{% endblock %}
+
+{% block content %}
+
+<section class="page-shell">
+    <div class="section-card">
+        <header class="section-hero">
+            <span class="eyebrow">Contact</span>
+            <h1>Get in Touch With the TruthLens Team</h1>
+            <p>
+                Share feedback, feature ideas, collaboration requests, or report an issue with analysis results.
+                We read every message and continuously improve the platform.
+            </p>
+        </header>
+
+        <div class="contact-layout">
+            <aside class="contact-info">
+                <h3>Support Channels</h3>
+                <p>
+                    We typically respond within 24-48 hours on business days.
+                </p>
+                <ul class="contact-list">
+                    <li>Email: zackryder38056@gmail.com</li>
+                    <li>Response Window: 24-48 business hours</li>
+                    <li>Use the form for all feedback and support requests</li>
+                </ul>
+            </aside>
+
+            <form method="POST" action="/contact" class="contact-form">
+                <h3>Send a Message</h3>
+
+                {% if status_message %}
+                    <div class="form-alert {{ status_type }}">{{ status_message }}</div>
+                {% endif %}
+
+                <label class="field-label" for="name">Name</label>
+                <input id="name" type="text" name="name" placeholder="Your full name" value="{{ form_name|default('') }}" required>
+
+                <label class="field-label" for="email">Email</label>
+                <input id="email" type="email" name="email" placeholder="you@example.com" value="{{ form_email|default('') }}">
+
+                <label class="field-label" for="message">Message</label>
+                <textarea id="message" name="message" placeholder="Write your message here..." required>{{ form_message|default('') }}</textarea>
+
+                <button type="submit">Send Message</button>
+                <p class="contact-note">Your details are only used to respond to your request.</p>
+            </form>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+
+<section class="page-shell">
+    <div class="section-card" style="max-width: 460px; margin: 0 auto;">
+        <header class="section-hero">
+            <h1>Welcome Back</h1>
+            <p>Sign in to access your credibility analysis tools.</p>
+        </header>
+
+        <form method="POST" action="/login" class="contact-form">
+            {% if status_message %}
+                <div class="form-alert {{ status_type }}">{{ status_message }}</div>
+            {% endif %}
+
+            <label class="field-label" for="username">Username</label>
+            <input id="username" type="text" name="username" placeholder="Enter your username" value="{{ form_username|default('') }}" required>
+
+            <label class="field-label" for="password">Password</label>
+            <input id="password" type="password" name="password" placeholder="Enter your password" required>
+
+            {% if show_forgot %}
+                <p class="contact-note" style="text-align: right; margin-top: 8px;">
+                    Forgot password? <a href="/forgot-password" style="color: #16d5ff; text-decoration: none; font-weight: 600;">Reset here</a>
+                </p>
+            {% endif %}
+
+            <button type="submit">Sign In</button>
+
+            <p class="contact-note" style="text-align: center;">Don't have an account? <a href="/register" style="color: #16d5ff; text-decoration: none; font-weight: 600;">Create one</a></p>
+            <p class="contact-note" style="text-align: center; margin-top: 6px;">Need password help? <a href="/forgot-password" style="color: #16d5ff; text-decoration: none; font-weight: 600;">Forgot Password</a></p>
+        </form>
+    </div>
+</section>
+
+{% endblock %}

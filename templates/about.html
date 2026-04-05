@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}About{% endblock %}
+
+{% block content %}
+
+<section class="page-shell">
+	<div class="section-card">
+		<header class="section-hero">
+			<span class="eyebrow">About TruthLens</span>
+			<h1>Credibility Intelligence for the Modern News Cycle</h1>
+			<p>
+				TruthLens helps readers assess article reliability using machine learning signals and external fact-check context.
+				The goal is simple: make verification fast, transparent, and understandable before misinformation spreads.
+			</p>
+		</header>
+
+		<div class="about-rich-grid">
+			<article class="feature-item">
+				<h3>Our Mission</h3>
+				<p>
+					To strengthen digital trust by providing timely credibility insights that support safer information decisions.
+				</p>
+			</article>
+			<article class="feature-item">
+				<h3>Design Philosophy</h3>
+				<p>
+					Human-centered and evidence-first: every score is paired with explainable context, not opaque verdicts.
+				</p>
+			</article>
+			<article class="feature-item">
+				<h3>Audience</h3>
+				<p>
+					Built for journalists, students, researchers, and public users navigating fast-moving information ecosystems.
+				</p>
+			</article>
+		</div>
+
+		<div class="feature-grid">
+			<article class="feature-item">
+				<h3>Machine Learning Analysis</h3>
+				<p>
+					Evaluates writing patterns and linguistic cues that commonly separate reliable reporting from misleading narratives.
+				</p>
+			</article>
+
+			<article class="feature-item">
+				<h3>Fact-Check Integration</h3>
+				<p>
+					Cross-references key extracted claims with verified public fact-check databases to add external validation.
+				</p>
+			</article>
+
+			<article class="feature-item">
+				<h3>Actionable Scoring</h3>
+				<p>
+					Converts model and fact-check evidence into a clear credibility score so users can decide what to trust next.
+				</p>
+			</article>
+		</div>
+
+		<div class="about-formal-copy">
+			<h3>Methodology Snapshot</h3>
+			<p>
+				The platform performs linguistic signal extraction, claim-level evidence checks, and confidence-weighted scoring.
+				Results are intended for guidance and should be interpreted alongside source evaluation and contextual review.
+			</p>
+		</div>
+
+		<section class="about-formal-copy policy-block" id="privacy">
+			<div class="policy-head">
+				<h3>Privacy Policy</h3>
+				<span>Effective Date: March 28, 2026</span>
+			</div>
+			<p>
+				TruthLens is committed to responsible data handling. This policy describes what information is processed,
+				how it is used, and the safeguards applied in normal operation.
+			</p>
+			<ul class="policy-list">
+				<li><strong>Data We Process:</strong> submitted article text for credibility analysis and optional contact details for support communication.</li>
+				<li><strong>Purpose Limitation:</strong> data is used strictly for analysis output generation, product quality checks, and user support response.</li>
+				<li><strong>Security Measures:</strong> standard technical and operational safeguards are used to protect processed information.</li>
+				<li><strong>No Legal Certification:</strong> platform scores are informational and do not represent legal verification or legal advice.</li>
+			</ul>
+		</section>
+
+		<section class="about-formal-copy policy-block" id="terms">
+			<div class="policy-head">
+				<h3>Terms of Use</h3>
+				<span>Last Updated: March 28, 2026</span>
+			</div>
+			<p>
+				By using TruthLens, users acknowledge that outputs are advisory signals designed to assist evaluation workflows.
+				Final editorial, academic, and professional decisions remain the user's responsibility.
+			</p>
+			<ul class="policy-list">
+				<li><strong>Permitted Use:</strong> personal, educational, and organizational credibility review use-cases.</li>
+				<li><strong>Decision Responsibility:</strong> users must independently verify high-impact claims before publication or action.</li>
+				<li><strong>Service Scope:</strong> model and fact-check outputs may evolve as datasets, APIs, and scoring methods are improved.</li>
+				<li><strong>Limitation:</strong> TruthLens is provided as an analytical aid and does not guarantee absolute factual correctness.</li>
+			</ul>
+		</section>
+	</div>
+</section>
+
+{% endblock %}

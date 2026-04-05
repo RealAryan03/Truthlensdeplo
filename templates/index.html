@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="hero-container analyze-layout">
+
+    <div class="hero-card">
+        <h1>TruthLens-Credibility Analyzer</h1>
+        <p class="hero-subtitle">Advanced Fake News Detection with DistilBERT + Google Fact Check API</p>
+
+        <form method="POST" action="/predict">
+            <textarea name="article" placeholder="Paste your article here..." required>{{ article|default('') }}</textarea>
+            <div class="article-meta">
+                <span>Tip: add a full paragraph for better prediction quality.</span>
+                <span id="article-char-count">0 chars</span>
+            </div>
+
+            <button type="submit" class="analyze-btn">
+                Analyze Article
+            </button>
+        </form>
+
+        {% if final_score is defined %}
+
+        {% if final_score > 60 %}
+            {% set score_class = 'good' %}
+        {% elif final_score >= 30 %}
+            {% set score_class = 'warning' %}
+        {% else %}
+            {% set score_class = 'danger' %}
+        {% endif %}
+
+        <div class="result-dashboard">
+
+            <!-- FINAL SCORE PANEL -->
+            <div class="summary-panel {{ score_class }}">
+                <h2 class="score-text {{ score_class }}">{{ final_score }}% Credibility</h2>
+                <div class="progress-bar">
+                    <div class="progress {{ score_class }}" data-score="{{ final_score }}"></div>
+                </div>
+                <p class="risk {{ score_class }}">
+                    {% if final_score > 60 %}
+                        Low Risk Content
+                    {% elif final_score >= 30 %}
+                        Needs Verification
+                    {% else %}
+                        High Risk / Potentially Fake
+                    {% endif %}
+                </p>
+            </div>
+
+            <!-- INDIVIDUAL SCORE CARDS -->
+            <div class="result-cards info-stack">
+
+                <!-- BERT SCORE -->
+                <div class="card neutral-surface">
+                    <h3 class="card-heading">DistilBERT Score</h3>
+                    <p>{{ bert_score }}%</p>
+                    <ul class="card-points">
+                        <li>Model Used: DistilBERT</li>
+                        <li>Fine-tuned for news credibility detection</li>
+                        <li>Weight in Final Score: 80%</li>
+                    </ul>
+                </div>
+
+                <!-- FACT CHECK -->
+                <div class="card neutral-surface">
+                    <h3 class="card-heading">Fact Check</h3>
+                    <p>{{ api_result }}</p>
+                    <ul class="card-points">
+                        <li>Source: Google Fact Check Tool API</li>
+                        <li>Weight in Final Score: 20%</li>
+                        <li>Claim-level evidence matching applied</li>
+                    </ul>
+                </div>
+
+                <!-- FINAL VERDICT -->
+                <div class="card score-surface {{ score_class }}">
+                    <h3 class="card-heading">Final Verdict</h3>
+                    <p>
+                        {% if final_score > 60 %}
+                            Trusted
+                        {% elif final_score >= 30 %}
+                            Suspicious
+                        {% else %}
+                            Fake
+                        {% endif %}
+                    </p>
+                    <ul class="card-points">
+                        <li>Score threshold calibrated for risk bands</li>
+                        <li>Use verdict with source-level verification</li>
+                    </ul>
+                </div>
+
+            </div>
+
+            <!-- EXPLANATION -->
+            <div class="explanation-box">
+                <h3>Explanation</h3>
+                <ul>
+                    {% for line in explanation %}
+                        <li>{{ line }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- INSIGHTS -->
+            <div class="insights-box">
+                <h3>Fake News Trends & Insights</h3>
+                <ul>
+                    <li>False information spreads faster than verified reporting during breaking events.</li>
+                    <li>High-risk channels include open social platforms, private groups, and viral short-form feeds.</li>
+                    <li>Emotion-heavy headlines and low-source transparency are recurring indicators of misleading content.</li>
+                    <li>Cross-check publication source, author credibility, and independent reporting for verification.</li>
+                </ul>
+            </div>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

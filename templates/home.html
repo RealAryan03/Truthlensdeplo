@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<section class="home-showcase page-shell">
+    <div class="section-card home-hero">
+        <span class="eyebrow">TruthLens Project</span>
+        <h1>AI-Powered Fake News Detection and Credibility Analyzer</h1>
+        <p>
+            TruthLens combines machine learning and fact-check verification to help users identify misleading
+            articles before they spread. We convert complex signals into clear trust scores you can act on.
+        </p>
+
+        <div class="home-metrics">
+            <div>
+                <h4>Dual-Layer Validation</h4>
+                <p>ML scoring + external fact-check references for balanced verdicts.</p>
+            </div>
+            <div>
+                <h4>Transparent Output</h4>
+                <p>Clear confidence ranges and human-readable explanations.</p>
+            </div>
+            <div>
+                <h4>Rapid Triage</h4>
+                <p>Designed for quick credibility checks in high-volume news cycles.</p>
+            </div>
+        </div>
+
+        <div class="home-actions">
+            <a href="/analyze" class="cta-primary">Go To Analyze</a>
+            <a href="/about" class="cta-secondary">Learn More</a>
+        </div>
+    </div>
+
+    <div class="home-grid">
+        <article class="section-card feature-highlight">
+            <h3>How It Works</h3>
+            <ul>
+                <li>Analyzes article language patterns with ML models</li>
+                <li>Extracts key claims and checks trusted fact-check sources</li>
+                <li>Returns a readable credibility score with clear explanation</li>
+                <li>Provides risk-oriented interpretation to support informed decisions</li>
+            </ul>
+        </article>
+
+        <article class="section-card visual-panel">
+            <h3>AI Visuals: Fake News Landscape</h3>
+            <div class="ai-visual-grid">
+                <figure>
+                    <img src="{{ url_for('static', filename='images/fake-news-network.svg') }}" alt="AI style visual of misinformation network">
+                    <figcaption>Misinformation Amplification Network</figcaption>
+                </figure>
+                <figure>
+                    <img src="{{ url_for('static', filename='images/fact-check-shield.svg') }}" alt="AI style visual of fact check protection shield">
+                    <figcaption>Fact-Check Protection Layer</figcaption>
+                </figure>
+                <figure>
+                    <img src="{{ url_for('static', filename='images/truth-vs-fake.svg') }}" alt="AI style visual comparing truth and fake content">
+                    <figcaption>Truth vs Fake Signal Contrast</figcaption>
+                </figure>
+            </div>
+        </article>
+    </div>
+
+    <div class="home-grid">
+        <article class="section-card governance-panel">
+            <h3>Responsible AI Principles</h3>
+            <p>
+                TruthLens is built to support critical thinking, not replace human judgment. The platform surfaces
+                evidence signals, confidence context, and explainable outputs to help users verify claims responsibly.
+            </p>
+            <p>
+                We continuously improve model quality, calibrate scoring thresholds, and prioritize transparency in how
+                verdicts are generated.
+            </p>
+        </article>
+
+        <article class="section-card governance-panel">
+            <h3>Use Cases</h3>
+            <ul>
+                <li>Journalists validating emerging narratives before publication</li>
+                <li>Students and researchers evaluating information quality</li>
+                <li>General readers fact-checking viral social content</li>
+                <li>Teams building media literacy workflows for institutions</li>
+            </ul>
+        </article>
+    </div>
+</section>
+
+{% endblock %}

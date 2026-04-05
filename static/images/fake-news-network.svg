@@ -1,0 +1,41 @@
+<svg width="860" height="520" viewBox="0 0 860 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Misinformation Network</title>
+  <desc id="desc">Abstract AI style graph showing fake news spread through connected nodes.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#101b3e"/>
+      <stop offset="100%" stop-color="#2a1140"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff5f76"/>
+      <stop offset="100%" stop-color="#ffd54a"/>
+    </linearGradient>
+    <radialGradient id="hot" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffcc4d"/>
+      <stop offset="100%" stop-color="#ff5f76"/>
+    </radialGradient>
+  </defs>
+  <rect width="860" height="520" rx="28" fill="url(#bg)"/>
+  <g opacity="0.75" stroke="url(#line)" stroke-width="2">
+    <path d="M90 120 L240 170 L330 110 L500 185 L700 120"/>
+    <path d="M240 170 L220 320 L410 300 L590 350 L760 270"/>
+    <path d="M110 390 L220 320 L390 420 L590 350 L700 430"/>
+    <path d="M330 110 L410 300 L500 185"/>
+    <path d="M500 185 L590 350 L700 120"/>
+  </g>
+  <g>
+    <circle cx="90" cy="120" r="17" fill="url(#hot)"/>
+    <circle cx="240" cy="170" r="13" fill="#7fe6ff"/>
+    <circle cx="330" cy="110" r="12" fill="#7fe6ff"/>
+    <circle cx="500" cy="185" r="16" fill="url(#hot)"/>
+    <circle cx="700" cy="120" r="13" fill="#7fe6ff"/>
+    <circle cx="220" cy="320" r="14" fill="url(#hot)"/>
+    <circle cx="410" cy="300" r="15" fill="#7fe6ff"/>
+    <circle cx="590" cy="350" r="16" fill="url(#hot)"/>
+    <circle cx="760" cy="270" r="12" fill="#7fe6ff"/>
+    <circle cx="110" cy="390" r="12" fill="#7fe6ff"/>
+    <circle cx="390" cy="420" r="14" fill="#7fe6ff"/>
+    <circle cx="700" cy="430" r="15" fill="url(#hot)"/>
+  </g>
+  <text x="36" y="54" fill="#e4ecff" font-family="Arial, sans-serif" font-size="22" font-weight="700">Fake News Propagation Map</text>
+</svg>

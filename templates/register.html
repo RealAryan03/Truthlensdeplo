@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Register{% endblock %}
+
+{% block content %}
+
+<section class="page-shell">
+    <div class="section-card" style="max-width: 460px; margin: 0 auto;">
+        <header class="section-hero">
+            <h1>Create Your Account</h1>
+            <p>Join TruthLens to analyze article credibility instantly.</p>
+        </header>
+
+        <form method="POST" action="/register" class="contact-form">
+            {% if status_message %}
+                <div class="form-alert {{ status_type }}">{{ status_message }}</div>
+            {% endif %}
+
+            <label class="field-label" for="username">Username</label>
+            <input id="username" type="text" name="username" placeholder="Choose your username" value="{{ form_username|default('') }}" required>
+
+            <label class="field-label" for="email">Email</label>
+            <input id="email" type="email" name="email" placeholder="you@example.com" value="{{ form_email|default('') }}" required>
+
+            <label class="field-label" for="password">Password</label>
+            <input id="password" type="password" name="password" placeholder="Create a strong password (6+ chars)" required>
+
+            <label class="field-label" for="confirm_password">Confirm Password</label>
+            <input id="confirm_password" type="password" name="confirm_password" placeholder="Confirm your password" required>
+
+            <button type="submit">Create Account</button>
+
+            <p class="contact-note" style="text-align: center;">Already have an account? <a href="/login" style="color: #16d5ff; text-decoration: none; font-weight: 600;">Sign in</a></p>
+        </form>
+    </div>
+</section>
+
+{% if redirect_url %}
+    <script>
+        setTimeout(() => { window.location.href = "{{ redirect_url }}"; }, 2000);
+    </script>
+{% endif %}
+
+{% endblock %}

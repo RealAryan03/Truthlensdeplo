@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TruthLens{% endblock %}</title>
+
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/truthlens-logo.svg') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/truthlens-logo.svg') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script defer src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+
+    <div class="bg-orb orb-one"></div>
+    <div class="bg-orb orb-two"></div>
+    <div class="bg-orb orb-three"></div>
+
+    <nav class="navbar">
+        <div class="brand-wrap">
+            <img class="brand-logo" src="{{ url_for('static', filename='images/truthlens-logo.svg') }}" alt="TruthLens logo">
+            <div class="logo gradient-text">TruthLens</div>
+        </div>
+
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/analyze">Analyze</a>
+            <a href="/about">About</a>
+            <a href="/contact">Contact</a>
+        </div>
+
+        <div class="nav-buttons">
+            {% if session.get('username') %}
+                <div class="user-chip" title="Logged in user">
+                    <span class="profile-icon" aria-hidden="true"></span>
+                    <span class="user-name">{{ session['username'] }}</span>
+                </div>
+                <a href="/logout"><button class="login-btn">Log out</button></a>
+            {% else %}
+                <a href="/login"><button class="signup-btn">Login / Register</button></a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="page-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div>
+                <strong>TruthLens</strong>
+                <p>AI-assisted credibility analysis platform for responsible media consumption.</p>
+            </div>
+            <div class="footer-links">
+                <a href="/about">About</a>
+                <a href="/contact">Contact</a>
+                <a href="/about#privacy">Privacy Policy</a>
+                <a href="/about#terms">Terms of Use</a>
+            </div>
+        </div>
+        <p class="footer-copy">© 2026 TruthLens. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>

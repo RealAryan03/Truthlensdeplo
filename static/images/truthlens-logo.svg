@@ -1,0 +1,19 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">TruthLens Logo</title>
+  <desc id="desc">A shield and lens inspired logo representing fact checking and credibility analysis.</desc>
+  <defs>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#16d5ff"/>
+      <stop offset="100%" stop-color="#11de87"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#273f78"/>
+      <stop offset="100%" stop-color="#172548"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="#0d1738"/>
+  <path d="M64 20 L97 33 L93 66 C90 87 77 101 64 108 C51 101 38 87 35 66 L31 33 Z" fill="url(#shield)" stroke="#8bd9ff" stroke-opacity="0.35"/>
+  <circle cx="64" cy="59" r="18" fill="none" stroke="url(#ring)" stroke-width="7"/>
+  <circle cx="64" cy="59" r="7" fill="#9deaff"/>
+  <path d="M51 77 L60 86 L78 68" fill="none" stroke="#9cf7c7" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

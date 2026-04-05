@@ -1,0 +1,30 @@
+<svg width="860" height="520" viewBox="0 0 860 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Fact Check Shield</title>
+  <desc id="desc">Abstract AI style shield with verification marks and data streams.</desc>
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#081b30"/>
+      <stop offset="100%" stop-color="#103a36"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#16d5ff"/>
+      <stop offset="100%" stop-color="#11de87"/>
+    </linearGradient>
+  </defs>
+  <rect width="860" height="520" rx="28" fill="url(#bg2)"/>
+  <g opacity="0.3" stroke="#89f3ff" stroke-width="1.2">
+    <path d="M40 80 H820"/><path d="M40 150 H820"/><path d="M40 220 H820"/><path d="M40 290 H820"/><path d="M40 360 H820"/><path d="M40 430 H820"/>
+  </g>
+  <path d="M430 90 L610 150 L590 320 C580 390 520 440 430 470 C340 440 280 390 270 320 L250 150 Z" fill="url(#shield)" opacity="0.95"/>
+  <circle cx="430" cy="265" r="92" fill="#062238" opacity="0.8"/>
+  <path d="M386 262 L420 298 L478 228" fill="none" stroke="#95ffce" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#9deeff" opacity="0.85">
+    <rect x="84" y="122" width="130" height="16" rx="8"/>
+    <rect x="646" y="122" width="130" height="16" rx="8"/>
+    <rect x="110" y="208" width="170" height="16" rx="8"/>
+    <rect x="580" y="208" width="170" height="16" rx="8"/>
+    <rect x="132" y="296" width="150" height="16" rx="8"/>
+    <rect x="578" y="296" width="150" height="16" rx="8"/>
+  </g>
+  <text x="36" y="54" fill="#e4ecff" font-family="Arial, sans-serif" font-size="22" font-weight="700">Fact-Check Security Layer</text>
+</svg>
