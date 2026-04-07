@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: truthlens-backend
+    env: python
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: gunicorn app:app --workers 1 --timeout 180
+    autoDeploy: true
