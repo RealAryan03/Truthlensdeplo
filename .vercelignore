@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+venv/
+env/
+*.pyc
+__pycache__
+.env
+.env.local
+.pytest_cache
+.coverage
+*.db-journal
+instance/
+node_modules/
+.DS_Store
