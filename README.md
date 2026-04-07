@@ -46,7 +46,7 @@ source .venv/bin/activate
 ## 4) Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-render.txt
 python -m spacy download en_core_web_sm
 ```
 
@@ -68,7 +68,7 @@ cp .env.example .env
 
 Required and optional values are documented in `.env.example`.
 
-For Contact Us + Forgot Password to be fully functional in production, set:
+For the full backend to work in production, set:
 - `SECRET_KEY` (required)
 - `DATABASE_URL` (required for shared cloud database; if omitted uses local SQLite)
 - `EMAIL` (your Gmail address used to send emails)
@@ -89,13 +89,19 @@ python app.py
 Open:
 - http://127.0.0.1:5000
 
-## Deployment: Railway + External Postgres
+## Deployment: Vercel Frontend + Render Backend
 
-### Backend (Railway)
+### Frontend (Vercel)
 
-- This repository is configured for Railway using the main Flask app in `app.py`.
-- Railway is the recommended place to run the full original prediction stack.
-- Set environment variables in Railway:
+- Vercel acts as the public frontend and reverse proxy.
+- Set `BACKEND_URL` in Vercel to your Render backend URL.
+- The Vercel proxy forwards all browser requests to the Render backend so sessions and forms keep working under one frontend domain.
+
+### Backend (Render)
+
+- Render runs the full Flask app from `app.py`.
+- Use `requirements-render.txt` on Render so the full prediction stack installs correctly.
+- Set environment variables in Render:
 	- `SECRET_KEY`
 	- `DATABASE_URL` (use Neon, Supabase, or another managed Postgres URL)
 	- `EMAIL`
@@ -105,11 +111,11 @@ Open:
 	- `SESSION_COOKIE_SECURE=true`
 	- `FACT_CHECK_API_KEY` (optional)
 
-### Frontend
+### How the split works
 
-- If you deploy a separate frontend, set `API_BASE_URL` to your Railway backend URL.
-- Forms for contact, forgot-password, reset-password, and analyze automatically route to this base URL when set.
-- If your frontend uses fetch/axios, point all API calls to `${API_BASE_URL}/contact`, `${API_BASE_URL}/forgot-password`, `${API_BASE_URL}/reset-password`, and `${API_BASE_URL}/predict`.
+- Users open the Vercel URL.
+- Vercel forwards requests to Render.
+- Render serves the full app, login sessions, contact, forgot/reset password, and article analysis.
 
 ## 7) Verify Contact Us and Analyze in a Fresh Clone
 
@@ -117,7 +123,7 @@ Open:
 2. Submit Name + Message (Email optional).
 3. Confirm success message appears.
 4. Confirm message is stored in the database.
-5. Open Analyze Article and confirm the full score flow is working.
+5. Open Analyze Article and confirm the full score flow is working through the Vercel frontend proxy.
 
 ## Gmail SMTP Notes
 
@@ -135,10 +141,18 @@ Gmail setup:
 - The app auto-detects `postgres://` and converts it to `postgresql://`.
 - Local development still works with SQLite when `DATABASE_URL` is unset.
 
-### Railway start command
+### Render start command
 
 - Use `gunicorn app:app --workers 1 --timeout 180`
 - The included `Procfile` already matches this.
+
+### Render build command
+
+- Install the full stack with `pip install -r requirements-render.txt`
+
+### Vercel environment variables
+
+- `BACKEND_URL` = your Render backend URL
 
 ## Password Reset OTP Notes
 
