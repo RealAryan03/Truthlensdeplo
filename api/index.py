@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy import text, or_, func
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import generate_password_hash, check_password_hash
 from pathlib import Path
 import sys
@@ -461,6 +462,7 @@ def register():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '').strip()
         confirm_password = request.form.get('confirm_password', '').strip()
+
         if not username or not email or not password or not confirm_password:
             return render_template(
                 "register.html",
@@ -493,26 +495,50 @@ def register():
                 form_username=username,
                 form_email=email,
             )
-        if User.query.filter_by(username=username).first():
+
+        try:
+            if User.query.filter_by(username=username).first():
+                return render_template(
+                    "register.html",
+                    status_type="error",
+                    status_message="Username already exists.",
+                    form_username=username,
+                    form_email=email,
+                )
+            if User.query.filter_by(email=email).first():
+                return render_template(
+                    "register.html",
+                    status_type="error",
+                    status_message="Email already registered.",
+                    form_username=username,
+                    form_email=email,
+                )
+
+            user = User(username=username, email=email)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            app.logger.exception("Registration database error: %s", e)
             return render_template(
                 "register.html",
                 status_type="error",
-                status_message="Username already exists.",
+                status_message="Registration failed due to a database issue. Please retry in a few seconds.",
                 form_username=username,
                 form_email=email,
-            )
-        if User.query.filter_by(email=email).first():
+            ), 503
+        except Exception as e:
+            db.session.rollback()
+            app.logger.exception("Registration unexpected error: %s", e)
             return render_template(
                 "register.html",
                 status_type="error",
-                status_message="Email already registered.",
+                status_message="Something went wrong while creating your account. Please try again.",
                 form_username=username,
                 form_email=email,
-            )
-        user = User(username=username, email=email)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
+            ), 500
+
         return render_template(
             "register.html",
             status_type="success",
