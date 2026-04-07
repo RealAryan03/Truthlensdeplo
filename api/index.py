@@ -62,7 +62,6 @@ def forward_request(path: str = ""):
     )
 
     excluded_response_headers = {
-        "content-encoding",
         "content-length",
         "transfer-encoding",
         "connection",
