@@ -4,7 +4,6 @@ import smtplib
 import ssl
 import secrets
 import bcrypt
-import math
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
@@ -622,14 +621,3 @@ def contact():
             status_message = "Message received successfully. We will get back to you soon."
         return contact_response(True, status_message, status_code=200, form_data={})
     return contact_response(False, "Method not allowed.", status_code=405)
-
-
-@app.route('/predict', methods=['POST'])
-def predict():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return render_template(
-        "index.html",
-        status_type="error",
-        status_message="Prediction is disabled on Vercel free serverless due to size limits. Deploy backend on Render/Railway to enable full ML analysis.",
-    )
