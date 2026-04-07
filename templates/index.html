@@ -52,6 +52,18 @@
             <!-- INDIVIDUAL SCORE CARDS -->
             <div class="result-cards info-stack">
 
+
+                <!-- ML SCORE -->
+                <div class="card neutral-surface">
+                    <h3 class="card-heading">ML Model Score(Logistic Regression)</h3>
+                    <p>{{ ml_score }}%</p>
+                    <ul class="card-points">
+                        <li>Model Algorithm: Logistic Regression</li>
+                        <li>Accuracy of Model: 98.27%</li>
+                        <li>Weight in Final Score: 40%</li>
+                    </ul>
+                </div>
+
                 <!-- BERT SCORE -->
                 <div class="card neutral-surface">
                     <h3 class="card-heading">DistilBERT Score</h3>
@@ -59,7 +71,7 @@
                     <ul class="card-points">
                         <li>Model Used: DistilBERT</li>
                         <li>Fine-tuned for news credibility detection</li>
-                        <li>Weight in Final Score: 80%</li>
+                        <li>Weight in Final Score: 50%</li>
                     </ul>
                 </div>
 
@@ -69,7 +81,7 @@
                     <p>{{ api_result }}</p>
                     <ul class="card-points">
                         <li>Source: Google Fact Check Tool API</li>
-                        <li>Weight in Final Score: 20%</li>
+                        <li>Weight in Final Score: 10%</li>
                         <li>Claim-level evidence matching applied</li>
                     </ul>
                 </div>

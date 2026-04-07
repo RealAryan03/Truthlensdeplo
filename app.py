@@ -15,6 +15,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from backend.bert_model import get_bert_score
+import pickle
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -670,9 +671,14 @@ def predict():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    article = request.form.get('article', '').strip()
+    article = request.form['article']
 
-    # -------- DistilBERT Prediction --------
+    # -------- ML Prediction (0.4 weight) --------
+    article_vec = vectorizer.transform([article])
+    ml_score = model.predict_proba(article_vec)[0][1]  # 0-1
+    ml_score_percent = ml_score * 100
+
+    # -------- BERT Prediction (0.5 weight) --------
     bert_score = get_bert_score(article)  # 0-1
     bert_score_percent = bert_score * 100
 
@@ -687,20 +693,18 @@ def predict():
     # Final API decision (TRUE / FALSE / NO DATA)
     api_result = final_api_decision(api_results)
 
-    # -------- Final Credibility Score (BERT + API) --------
-    # Convert API result to score
-    api_score_map = {"TRUE": 1, "FALSE": 0, "NO DATA": 0.5}
+    # Convert API result to weight (0.1 weight)
+    api_score_map = {"True": 1, "False": 0, "No Data": 0.5}
     api_score = api_score_map.get(api_result, 0.5)  # default 0.5 if unknown
-    
-    # Combined score: 80% BERT + 20% API
-    final_score = 0.7 * bert_score_percent + 0.3 * (api_score * 100)
+
+    # -------- Final Combined Credibility Score --------
+    final_score = 0.5 * bert_score_percent + 0.4 * ml_score_percent + 0.1 * (api_score * 100)
 
     # -------- Explanation --------
-    # Since we don't have ML score anymore, we'll pass None or adjust the function
-    explanation = generate_explanation(None, bert_score_percent, api_result)
+    explanation = generate_explanation(ml_score_percent, bert_score_percent, api_result)
 
     return render_template("index.html",
-                           article=article,
+                           ml_score=round(ml_score_percent, 2),
                            bert_score=round(bert_score_percent, 2),
                            api_result=api_result,
                            final_score=round(final_score, 2),
