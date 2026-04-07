@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
 import requests
-import spacy
 import os
 import smtplib
 import ssl
@@ -19,8 +18,15 @@ import sys
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.bert_model import get_bert_score
-import pickle
+try:
+    import spacy
+except Exception:
+    spacy = None
+
+try:
+    from backend.bert_model import get_bert_score
+except Exception:
+    get_bert_score = None
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -122,17 +128,13 @@ _NLP = None
 
 def get_ml_assets():
     global _MODEL, _VECTORIZER
-    if _MODEL is None or _VECTORIZER is None:
-        try:
-            _MODEL = pickle.load(open(str(BASE_DIR / "model_ml.pkl"), "rb"))
-            _VECTORIZER = pickle.load(open(str(BASE_DIR / "vectorizer_ml.pkl"), "rb"))
-        except Exception as e:
-            raise Exception(f"Failed to load ML assets: {e}")
-    return _MODEL, _VECTORIZER
+    raise RuntimeError("Prediction pipeline disabled on Vercel serverless deployment.")
 
 
 def get_nlp_model():
     global _NLP
+    if spacy is None:
+        return None
     if _NLP is None:
         try:
             _NLP = spacy.load("en_core_web_sm")
@@ -145,6 +147,9 @@ def get_nlp_model():
 
 def extract_main_sentences(text, n=3):
     nlp = get_nlp_model()
+    if nlp is None:
+        parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", text or "") if p.strip()]
+        return parts[:n]
     doc = nlp(text)
     sentences = list(doc.sents)
     sentence_scores = {}
@@ -562,35 +567,8 @@ def contact():
 def predict():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    article = request.form.get('article', '')
-    try:
-        model, vectorizer = get_ml_assets()
-        article_vec = vectorizer.transform([article])
-        ml_score = model.predict_proba(article_vec)[0][1]
-        ml_score_percent = ml_score * 100
-    except Exception as e:
-        app.logger.exception("ML assets could not be loaded: %s", e)
-        return render_template(
-            "index.html",
-            status_type="error",
-            status_message="Prediction service is temporarily unavailable. Please try again in a minute.",
-        )
-    bert_score = get_bert_score(article)
-    bert_score_percent = bert_score * 100
-    main_sentences = extract_main_sentences(article)
-    api_results = []
-    for sent in main_sentences:
-        if len(sent) < 300:
-            result = check_fact_api(sent)
-            api_results.append(result)
-    api_result = final_api_decision(api_results)
-    api_score_map = {"True": 1, "False": 0, "No Data": 0.5}
-    api_score = api_score_map.get(api_result, 0.5)
-    final_score = 0.5 * bert_score_percent + 0.4 * ml_score_percent + 0.1 * (api_score * 100)
-    explanation = generate_explanation(ml_score_percent, bert_score_percent, api_result)
-    return render_template("index.html",
-                           ml_score=round(ml_score_percent, 2),
-                           bert_score=round(bert_score_percent, 2),
-                           api_result=api_result,
-                           final_score=round(final_score, 2),
-                           explanation=explanation)
+    return render_template(
+        "index.html",
+        status_type="error",
+        status_message="Prediction is disabled on Vercel free serverless due to size limits. Deploy backend on Render/Railway to enable full ML analysis.",
+    )

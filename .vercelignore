@@ -13,3 +13,9 @@ __pycache__
 instance/
 node_modules/
 .DS_Store
+bert_model/
+backend/
+model_ml.pkl
+vectorizer_ml.pkl
+code.ipynb
+data-set/
