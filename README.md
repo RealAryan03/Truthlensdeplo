@@ -89,23 +89,26 @@ python app.py
 Open:
 - http://127.0.0.1:5000
 
-## Deployment: Render + Vercel
+## Deployment: Vercel + External Postgres
 
-### Backend (Render)
+### Backend (Vercel)
 
-- Start command: `gunicorn app:app`
-- Procfile is included with: `web: gunicorn app:app`
-- Set environment variables in Render:
+- This repository is configured for Vercel serverless deployment through `api/index.py`.
+- Set environment variables in Vercel:
+	- `SECRET_KEY`
+	- `DATABASE_URL` (use Neon, Supabase, or another managed Postgres URL)
 	- `EMAIL`
 	- `APP_PASSWORD`
 	- `ADMIN_EMAIL`
 	- `CONTACT_RECIPIENT`
-	- `FRONTEND_ORIGIN` (your Vercel domain, e.g. `https://your-app.vercel.app`)
+	- `FRONTEND_ORIGIN` (your frontend origin, if needed)
+	- `SESSION_COOKIE_SECURE=true`
+	- `FACT_CHECK_API_KEY` (optional)
 
-### Frontend (Vercel)
+### Frontend
 
-- Set `API_BASE_URL` to your deployed backend URL (for example `https://truthlens.onrender.com`).
-- Forms for contact/forgot/reset/predict automatically route to this base URL when set.
+- If you deploy a separate frontend, set `API_BASE_URL` to your Vercel backend URL.
+- Forms for contact and password reset automatically route to this base URL when set.
 - If your frontend uses fetch/axios, point all API calls to `${API_BASE_URL}/contact`, `${API_BASE_URL}/forgot-password`, and `${API_BASE_URL}/reset-password`.
 
 ## 7) Verify Contact Us in a Fresh Clone
@@ -134,7 +137,8 @@ Gmail setup:
 ## Password Reset OTP Notes
 
 - Password reset uses secure one-time OTPs valid for 10 minutes.
-- OTPs are hashed before storage and invalidated after use.
+- Forgot Password is a two-step flow: send OTP on the same page, verify it there, then enter the new password on the next page.
+- OTPs are invalidated after use.
 
 If SMTP is missing or fails:
 - Contact message is still saved.
