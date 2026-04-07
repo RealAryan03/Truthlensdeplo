@@ -50,6 +50,8 @@ def forward_request(path: str = ""):
         if key.lower() not in HOP_BY_HOP_HEADERS
     }
     headers["Host"] = urlsplit(BACKEND_URL).netloc
+    # Avoid gzip/brotli re-encoding mismatches across proxy hops.
+    headers["Accept-Encoding"] = "identity"
 
     response = requests.request(
         method=request.method,
@@ -62,6 +64,7 @@ def forward_request(path: str = ""):
     )
 
     excluded_response_headers = {
+        "content-encoding",
         "content-length",
         "transfer-encoding",
         "connection",
