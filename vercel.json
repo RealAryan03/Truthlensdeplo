@@ -1,8 +1,14 @@
 {
-  "rewrites": [
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://truthlensdeplo.onrender.com",
+      "permanent": false
+    },
     {
       "source": "/(.*)",
-      "destination": "https://truthlensdeplo.onrender.com/$1"
+      "destination": "https://truthlensdeplo.onrender.com/$1",
+      "permanent": false
     }
   ]
 }
