@@ -34,6 +34,14 @@ load_dotenv(BASE_DIR / ".env")
 
 
 def get_database_uri():
+    # Vercel deployments are most stable with local /tmp sqlite unless
+    # external Postgres is explicitly enabled via env.
+    is_vercel = bool((os.getenv("VERCEL") or "").strip())
+    use_external_on_vercel = (os.getenv("USE_EXTERNAL_DB_ON_VERCEL") or "false").strip().lower() == "true"
+
+    if is_vercel and not use_external_on_vercel:
+        return "sqlite:////tmp/users.db"
+
     database_url = (os.getenv("DATABASE_URL") or "").strip()
     if not database_url:
         # Vercel serverless runtime allows writes only in /tmp.
@@ -524,7 +532,7 @@ def register():
             return render_template(
                 "register.html",
                 status_type="error",
-                status_message="Registration failed due to a database issue. Please retry in a few seconds.",
+                status_message="Registration failed due to a database issue. If this persists on Vercel, use sqlite fallback or verify DATABASE_URL + sslmode.",
                 form_username=username,
                 form_email=email,
             ), 503
