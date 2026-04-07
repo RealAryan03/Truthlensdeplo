@@ -35,7 +35,8 @@ load_dotenv(BASE_DIR / ".env")
 def get_database_uri():
     database_url = (os.getenv("DATABASE_URL") or "").strip()
     if not database_url:
-        return "sqlite:///users.db"
+        # Vercel serverless runtime allows writes only in /tmp.
+        return "sqlite:////tmp/users.db"
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     if "supabase.co" in database_url and "sslmode=" not in database_url:
@@ -95,22 +96,29 @@ class Contact(db.Model):
     message = db.Column(db.Text, nullable=False)
 
 
-# Create database tables
-with app.app_context():
-    db.create_all()
+def initialize_database_safely():
     try:
-        user_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)")).fetchall()]
-        if "email" not in user_columns:
-            db.session.execute(text("ALTER TABLE user ADD COLUMN email VARCHAR(255)"))
-        if "password" not in user_columns:
-            db.session.execute(text("ALTER TABLE user ADD COLUMN password VARCHAR(255)"))
-        if "otp" not in user_columns:
-            db.session.execute(text("ALTER TABLE user ADD COLUMN otp VARCHAR(6)"))
-        if "password_hash" in user_columns:
-            db.session.execute(text("UPDATE user SET password = password_hash WHERE password IS NULL"))
-        db.session.commit()
-    except:
-        pass
+        with app.app_context():
+            db.create_all()
+            try:
+                # SQLite-only migration path; PostgreSQL will skip this block.
+                user_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)")).fetchall()]
+                if "email" not in user_columns:
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN email VARCHAR(255)"))
+                if "password" not in user_columns:
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN password VARCHAR(255)"))
+                if "otp" not in user_columns:
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN otp VARCHAR(6)"))
+                if "password_hash" in user_columns:
+                    db.session.execute(text("UPDATE user SET password = password_hash WHERE password IS NULL"))
+                db.session.commit()
+            except Exception:
+                pass
+    except Exception as e:
+        app.logger.exception("Database initialization skipped due to startup error: %s", e)
+
+
+initialize_database_safely()
 
 
 API_KEY = os.getenv("FACT_CHECK_API_KEY")
@@ -323,6 +331,10 @@ def inject_frontend_config():
 
 
 # -------- ROUTES --------
+
+@app.route('/healthz')
+def healthz():
+    return jsonify({"ok": True}), 200
 
 @app.route('/')
 def home():
