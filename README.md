@@ -89,34 +89,35 @@ python app.py
 Open:
 - http://127.0.0.1:5000
 
-## Deployment: Vercel + External Postgres
+## Deployment: Railway + External Postgres
 
-### Backend (Vercel)
+### Backend (Railway)
 
-- This repository is configured for Vercel serverless deployment through `api/index.py`.
-- Set environment variables in Vercel:
+- This repository is configured for Railway using the main Flask app in `app.py`.
+- Railway is the recommended place to run the full original prediction stack.
+- Set environment variables in Railway:
 	- `SECRET_KEY`
 	- `DATABASE_URL` (use Neon, Supabase, or another managed Postgres URL)
 	- `EMAIL`
 	- `APP_PASSWORD`
 	- `ADMIN_EMAIL`
 	- `CONTACT_RECIPIENT`
-	- `FRONTEND_ORIGIN` (your frontend origin, if needed)
 	- `SESSION_COOKIE_SECURE=true`
 	- `FACT_CHECK_API_KEY` (optional)
 
 ### Frontend
 
-- If you deploy a separate frontend, set `API_BASE_URL` to your Vercel backend URL.
-- Forms for contact and password reset automatically route to this base URL when set.
-- If your frontend uses fetch/axios, point all API calls to `${API_BASE_URL}/contact`, `${API_BASE_URL}/forgot-password`, and `${API_BASE_URL}/reset-password`.
+- If you deploy a separate frontend, set `API_BASE_URL` to your Railway backend URL.
+- Forms for contact, forgot-password, reset-password, and analyze automatically route to this base URL when set.
+- If your frontend uses fetch/axios, point all API calls to `${API_BASE_URL}/contact`, `${API_BASE_URL}/forgot-password`, `${API_BASE_URL}/reset-password`, and `${API_BASE_URL}/predict`.
 
-## 7) Verify Contact Us in a Fresh Clone
+## 7) Verify Contact Us and Analyze in a Fresh Clone
 
 1. Open Contact page.
 2. Submit Name + Message (Email optional).
 3. Confirm success message appears.
-4. Confirm message is stored in SQLite database at `instance/users.db` table `contact_message`.
+4. Confirm message is stored in the database.
+5. Open Analyze Article and confirm the full score flow is working.
 
 ## Gmail SMTP Notes
 
@@ -130,9 +131,14 @@ Gmail setup:
 
 ## Cloud Database Notes
 
-- For Render/Railway/Fly.io/Globe-like platforms, use a managed Postgres URL in `DATABASE_URL`.
+- For Railway/Render/Fly.io/other container platforms, use a managed Postgres URL in `DATABASE_URL`.
 - The app auto-detects `postgres://` and converts it to `postgresql://`.
 - Local development still works with SQLite when `DATABASE_URL` is unset.
+
+### Railway start command
+
+- Use `gunicorn app:app --workers 1 --timeout 180`
+- The included `Procfile` already matches this.
 
 ## Password Reset OTP Notes
 
