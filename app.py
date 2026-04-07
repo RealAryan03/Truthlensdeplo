@@ -14,7 +14,6 @@ from flask_cors import CORS
 from sqlalchemy import text, or_, func
 from werkzeug.security import generate_password_hash, check_password_hash
 from pathlib import Path
-from backend.bert_model import get_bert_score
 import pickle
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -122,6 +121,7 @@ ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or CONTACT_RECIPIENT or SMTP_EMAIL).stri
 _MODEL = None
 _VECTORIZER = None
 _NLP = None
+_BERT_SCORER = None
 
 
 def get_ml_assets():
@@ -130,6 +130,15 @@ def get_ml_assets():
         _MODEL = pickle.load(open("model_ml.pkl", "rb"))
         _VECTORIZER = pickle.load(open("vectorizer_ml.pkl", "rb"))
     return _MODEL, _VECTORIZER
+
+
+def get_bert_scorer():
+    global _BERT_SCORER
+    if _BERT_SCORER is None:
+        # Import lazily so the web service can boot before heavy model init.
+        from backend.bert_model import get_bert_score as _get_bert_score
+        _BERT_SCORER = _get_bert_score
+    return _BERT_SCORER
 
 
 def get_nlp_model():
@@ -682,8 +691,17 @@ def predict():
         )
 
     # -------- BERT Prediction (0.5 weight) --------
-    bert_score = get_bert_score(article)  # 0-1
-    bert_score_percent = bert_score * 100
+    try:
+        bert_scorer = get_bert_scorer()
+        bert_score = bert_scorer(article)  # 0-1
+        bert_score_percent = bert_score * 100
+    except Exception as e:
+        app.logger.exception("BERT scorer could not be loaded: %s", e)
+        return render_template(
+            "index.html",
+            status_type="error",
+            status_message="Prediction service is warming up. Please try again in a minute.",
+        )
 
     # -------- Extract key sentences for API --------
     main_sentences = extract_main_sentences(article)
