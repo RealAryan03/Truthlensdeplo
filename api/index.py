@@ -34,15 +34,15 @@ load_dotenv(BASE_DIR / ".env")
 
 
 def get_database_uri():
-    # Vercel deployments are most stable with local /tmp sqlite unless
-    # external Postgres is explicitly enabled via env.
+    # On Vercel: prefer external DB when DATABASE_URL is provided,
+    # otherwise fall back to /tmp sqlite.
     is_vercel = bool((os.getenv("VERCEL") or "").strip())
-    use_external_on_vercel = (os.getenv("USE_EXTERNAL_DB_ON_VERCEL") or "false").strip().lower() == "true"
+    force_sqlite_on_vercel = (os.getenv("FORCE_SQLITE_ON_VERCEL") or "false").strip().lower() == "true"
+    database_url = (os.getenv("DATABASE_URL") or "").strip()
 
-    if is_vercel and not use_external_on_vercel:
+    if is_vercel and (force_sqlite_on_vercel or not database_url):
         return "sqlite:////tmp/users.db"
 
-    database_url = (os.getenv("DATABASE_URL") or "").strip()
     if not database_url:
         # Vercel serverless runtime allows writes only in /tmp.
         return "sqlite:////tmp/users.db"
@@ -362,15 +362,20 @@ def analyze():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        identifier = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        if not username or not password:
+        if not identifier or not password:
             return render_template(
                 "login.html",
                 status_type="error",
                 status_message="Username and password are required."
             )
-        user = User.query.filter_by(username=username).first()
+
+        identifier_lc = identifier.lower()
+        user = User.query.filter(
+            or_(func.lower(User.username) == identifier_lc, func.lower(User.email) == identifier_lc)
+        ).first()
+
         if user and user.check_password(password):
             session['user_id'] = user.id
             session['username'] = user.username
@@ -380,7 +385,7 @@ def login():
                 "login.html",
                 status_type="error",
                 status_message="Invalid username or password.",
-                form_username=username,
+                form_username=identifier,
                 show_forgot=True
             )
     return render_template("login.html")
