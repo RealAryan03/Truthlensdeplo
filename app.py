@@ -86,22 +86,31 @@ class Contact(db.Model):
 
 
 # Create database tables
-with app.app_context():
-    db.create_all()
+def initialize_database_safely():
+    try:
+        with app.app_context():
+            db.create_all()
 
-    # Backward-compatible schema updates for existing SQLite DBs.
-    user_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)")).fetchall()]
-    if "email" not in user_columns:
-        db.session.execute(text("ALTER TABLE user ADD COLUMN email VARCHAR(255)"))
-    if "password" not in user_columns:
-        db.session.execute(text("ALTER TABLE user ADD COLUMN password VARCHAR(255)"))
-    if "otp" not in user_columns:
-        db.session.execute(text("ALTER TABLE user ADD COLUMN otp VARCHAR(6)"))
+            # Backward-compatible schema updates only for SQLite.
+            if app.config['SQLALCHEMY_DATABASE_URI'].startswith("sqlite"):
+                user_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)")).fetchall()]
+                if "email" not in user_columns:
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN email VARCHAR(255)"))
+                if "password" not in user_columns:
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN password VARCHAR(255)"))
+                if "otp" not in user_columns:
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN otp VARCHAR(6)"))
 
-    # If migrating from old schema, copy password_hash values into password.
-    if "password_hash" in user_columns:
-        db.session.execute(text("UPDATE user SET password = password_hash WHERE password IS NULL"))
-    db.session.commit()
+                # If migrating from old schema, copy password_hash values into password.
+                if "password_hash" in user_columns:
+                    db.session.execute(text("UPDATE user SET password = password_hash WHERE password IS NULL"))
+
+            db.session.commit()
+    except Exception as e:
+        app.logger.exception("Database initialization skipped due to startup error: %s", e)
+
+
+initialize_database_safely()
 
 
 
