@@ -89,7 +89,10 @@
                 <!-- FINAL VERDICT -->
                 <div class="card score-surface {{ score_class }}">
                     <h3 class="card-heading">Final Verdict</h3>
-                    <p>
+                    <p
+                        class="verdict-text {{ score_class }}"
+                        style="color: {% if final_score > 60 %}#15d980{% elif final_score >= 30 %}#ffd54a{% else %}#ff5e5b{% endif %} !important; -webkit-text-fill-color: {% if final_score > 60 %}#15d980{% elif final_score >= 30 %}#ffd54a{% else %}#ff5e5b{% endif %} !important;"
+                    >
                         {% if final_score > 60 %}
                             Trusted
                         {% elif final_score >= 30 %}

@@ -50,7 +50,10 @@
     <footer class="site-footer">
         <div class="footer-inner">
             <div>
-                <strong>TruthLens</strong>
+                <div class="brand-wrap footer-brand" aria-label="TruthLens brand footer">
+                    <img class="brand-logo" src="{{ url_for('static', filename='images/truthlens-logo.svg') }}" alt="TruthLens logo">
+                    <div class="logo gradient-text">TruthLens</div>
+                </div>
                 <p>AI-assisted credibility analysis platform for responsible media consumption.</p>
             </div>
             <div class="footer-links">

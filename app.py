@@ -592,16 +592,13 @@ def register():
         db.session.add(user)
         db.session.commit()
 
-        session['user_id'] = user.id
-        session['username'] = user.username
-
         return render_template(
             "register.html",
             status_type="success",
-            status_message="Registration successful! Redirecting to home...",
+            status_message="Registration successful! Redirecting to login...",
             form_username="",
             form_email="",
-            redirect_url=url_for('home')
+            redirect_url=url_for('login')
         )
 
     return render_template("register.html")

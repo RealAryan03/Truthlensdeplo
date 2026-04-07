@@ -17,6 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
 function initPageTransitions() {
     document.body.style.opacity = '0';
     document.body.style.transition = 'opacity 0.6s ease-in-out';
+
+    window.addEventListener('pageshow', () => {
+        document.body.style.opacity = '1';
+    });
     
     setTimeout(() => {
         document.body.style.opacity = '1';

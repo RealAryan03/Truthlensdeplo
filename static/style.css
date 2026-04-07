@@ -363,7 +363,10 @@ button[type="submit"] {
 }
 
 .explanation-box h3 {
+    display: inline-block;
     margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.45);
 }
 
 .explanation-box ul {
@@ -519,6 +522,74 @@ button[type="submit"] {
     background: rgba(255, 75, 85, 0.16);
     border-color: rgba(255, 122, 107, 0.4);
     color: #ffd4ce;
+}
+
+.auth-card {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.auth-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: auto;
+    margin: 0 auto 16px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.auth-brand .logo {
+    font-size: 1.58rem;
+}
+
+.auth-brand .brand-logo {
+    width: 38px;
+    height: 38px;
+}
+
+.auth-form {
+    margin-top: 6px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.04));
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
+}
+
+.auth-form button[type="submit"] {
+    width: 100%;
+}
+
+.auth-note {
+    margin-top: 12px;
+}
+
+.auth-note-center {
+    text-align: center;
+}
+
+.auth-note-right {
+    text-align: right;
+}
+
+.auth-note-tight {
+    margin-top: 6px;
+}
+
+.auth-link {
+    color: #5ee6ff;
+    text-decoration: none;
+    font-weight: 700;
+    border-bottom: 1px solid transparent;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.auth-link:hover {
+    color: #9af6ff;
+    border-bottom-color: rgba(154, 246, 255, 0.75);
 }
 
 @media (max-width: 900px) {
@@ -1188,7 +1259,18 @@ button,
     background: rgba(255, 255, 255, 0.05);
 }
 .about-formal-copy h3 {
+    display: inline-block;
     margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.45);
+}
+
+.about-rich-grid .feature-item h3,
+.feature-grid .feature-item h3,
+.policy-head h3 {
+    display: inline-block;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.45);
 }
 .about-formal-copy p {
     color: #d6e3ff;
@@ -1247,6 +1329,14 @@ button,
 .footer-inner strong {
     display: block;
     margin-bottom: 4px;
+}
+
+.footer-brand {
+    margin-bottom: 6px;
+}
+
+.footer-brand .logo {
+    font-size: 1.15rem;
 }
 .footer-inner p {
     margin: 0;
@@ -1382,13 +1472,13 @@ button,
 .score-surface.warning {
     background: linear-gradient(135deg, rgba(255, 205, 60, 0.25), rgba(255, 216, 102, 0.18));
     border: 1px solid rgba(255, 216, 102, 0.55);
-    color: #1d1d1d;
+    color: #f4f8ff;
 }
 
-.score-surface.warning p,
+.score-surface.warning p:not(.verdict-text),
 .score-surface.warning li,
 .score-surface.warning h3 {
-    color: #1d1d1d;
+    color: #f4f8ff;
 }
 
 .score-surface.danger {
@@ -1409,7 +1499,37 @@ button,
 }
 
 .score-surface.warning .card-heading {
-    border-bottom-color: rgba(25, 25, 25, 0.45);
+    border-bottom-color: rgba(255, 255, 255, 0.45);
+}
+
+.verdict-text {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    background: rgba(0, 0, 0, 0.16);
+    font-size: 1.08rem;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    text-shadow: 0 0 12px rgba(0, 0, 0, 0.28);
+}
+
+.score-surface .verdict-text.good {
+    color: var(--score-green);
+}
+
+.score-surface.warning .verdict-text.warning {
+    color: var(--score-yellow) !important;
+    background: rgba(255, 216, 102, 0.2);
+    border-color: rgba(255, 216, 102, 0.75);
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.score-surface .verdict-text.danger {
+    color: var(--score-red);
 }
 
 .card-points {
@@ -1439,7 +1559,10 @@ button,
 }
 
 .insights-box h3 {
+    display: inline-block;
     margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.45);
 }
 
 .insights-box ul {
