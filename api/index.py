@@ -4,6 +4,7 @@ import smtplib
 import ssl
 import secrets
 import bcrypt
+import math
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
@@ -407,6 +408,53 @@ def reset_password():
     return render_template("reset_password.html", form_identifier=email, form_otp=otp_code)
 
 
+def predict_credibility_lightweight(article):
+    text = (article or "").strip()
+    if not text:
+        return 0, 0, "No Data", 0, ["Paste a longer article for analysis."]
+
+    lowered = text.lower()
+    word_count = len(text.split())
+    exclamation_count = text.count("!")
+    question_count = text.count("?")
+    caps_words = sum(1 for word in text.split() if len(word) > 3 and word.isupper())
+    clickbait_hits = sum(1 for phrase in ["you won't believe", "shocking", "breaking", "must read", "secret", "viral"] if phrase in lowered)
+    source_hits = sum(1 for phrase in ["according to", "reported by", "official", "research", "study", "agency"] if phrase in lowered)
+
+    risk = 0
+    risk += min(exclamation_count * 4, 20)
+    risk += min(question_count * 2, 10)
+    risk += min(caps_words * 4, 20)
+    risk += min(clickbait_hits * 18, 36)
+
+    if word_count < 80:
+        risk += 15
+    elif word_count > 500:
+        risk -= 8
+
+    risk -= min(source_hits * 10, 20)
+    risk = max(0, min(risk, 100))
+
+    credibility = round(100 - risk, 2)
+    ml_score = round(max(0, min(100, credibility * 0.88 + 6)), 2)
+    bert_score = round(max(0, min(100, credibility * 0.94 + 3)), 2)
+    api_result = "No Data"
+    explanation = []
+
+    if clickbait_hits:
+        explanation.append("The article contains clickbait-style wording.")
+    if exclamation_count > 2 or caps_words > 2:
+        explanation.append("The article uses strong emphasis patterns.")
+    if source_hits:
+        explanation.append("The article includes source or evidence language.")
+    if word_count < 80:
+        explanation.append("The article is short, so confidence is lower.")
+    if not explanation:
+        explanation.append("The article looks neutral based on simple text signals.")
+
+    return ml_score, bert_score, api_result, credibility, explanation
+
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -511,6 +559,25 @@ def logout():
 @app.route('/about')
 def about():
     return render_template("about.html")
+
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    article = request.form.get('article', '')
+    ml_score, bert_score, api_result, final_score, explanation = predict_credibility_lightweight(article)
+
+    return render_template(
+        "index.html",
+        article=article,
+        ml_score=ml_score,
+        bert_score=bert_score,
+        api_result=api_result,
+        final_score=final_score,
+        explanation=explanation,
+    )
 
 
 @app.route('/contact', methods=['GET', 'POST', 'OPTIONS'])
