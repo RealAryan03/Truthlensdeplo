@@ -404,18 +404,53 @@ def login():
 def forgot_password():
     if request.method == 'POST':
         email = (request.form.get('email') or request.form.get('identifier') or '').strip().lower()
+        otp_action = (request.form.get('otp_action') or 'send').strip().lower()
+        otp_code = (request.form.get('otp') or '').strip()
         if request.is_json:
             payload = request.get_json(silent=True) or {}
             email = (payload.get('email') or '').strip().lower()
-        form_data = {"identifier": email}
+            otp_action = (payload.get('otp_action') or otp_action).strip().lower()
+            otp_code = (payload.get('otp') or otp_code).strip()
+
+        form_data = {"identifier": email, "otp": otp_code}
         if not email:
             return auth_response("forgot_password.html", False, "Please enter your email address.", 400, form_data)
         if not is_valid_email(email):
             return auth_response("forgot_password.html", False, "Please enter a valid email address.", 400, form_data)
         user = User.query.filter(func.lower(User.email) == email).first()
         generic_msg = "If an account with a verified email exists, an OTP has been sent."
+
+        if otp_action == 'verify':
+            if not otp_code:
+                return auth_response(
+                    "forgot_password.html",
+                    False,
+                    "Enter the OTP you received.",
+                    400,
+                    {"identifier": email, "otp": ""},
+                    extra_context={"otp_step": True},
+                )
+            if not user or not user.email or not user.otp or user.otp != otp_code:
+                return auth_response(
+                    "forgot_password.html",
+                    False,
+                    "Invalid OTP. Please request a new one.",
+                    400,
+                    {"identifier": email, "otp": otp_code},
+                    extra_context={"otp_step": True},
+                )
+            return redirect(url_for('reset_password', email=email, otp=otp_code))
+
         if not user or not user.email:
-            return auth_response("forgot_password.html", True, generic_msg, 200, {"identifier": ""})
+            return auth_response(
+                "forgot_password.html",
+                True,
+                generic_msg,
+                200,
+                {"identifier": email, "otp": ""},
+                extra_context={"otp_step": False},
+            )
+
         otp_code = f"{secrets.randbelow(1000000):06d}"
         user.otp = otp_code
         db.session.commit()
@@ -424,15 +459,23 @@ def forgot_password():
             user.otp = None
             app.logger.warning("Password reset email failed for user_id=%s: %s", user.id, email_error)
             db.session.commit()
+            return auth_response(
+                "forgot_password.html",
+                False,
+                "We could not send the OTP email. Please try again.",
+                500,
+                {"identifier": email, "otp": ""},
+                extra_context={"otp_step": False},
+            )
         return auth_response(
             "forgot_password.html",
             True,
-            f"{generic_msg} You can now enter the OTP on the reset page.",
+            "OTP sent. Enter the OTP below on this page to continue.",
             200,
-            {"identifier": email},
-            extra_context={"redirect_url": url_for('reset_password', email=email)},
+            {"identifier": email, "otp": ""},
+            extra_context={"otp_step": True},
         )
-    return render_template("forgot_password.html")
+    return render_template("forgot_password.html", otp_step=False)
 
 
 @app.route('/reset-password', methods=['GET', 'POST'])
@@ -475,7 +518,9 @@ def reset_password():
             form_data={"identifier": "", "otp": ""},
             extra_context={"redirect_url": url_for('login')},
         )
-    return render_template("reset_password.html")
+    email = (request.args.get('email') or '').strip().lower()
+    otp_code = (request.args.get('otp') or '').strip()
+    return render_template("reset_password.html", form_identifier=email, form_otp=otp_code)
 
 
 @app.route('/register', methods=['GET', 'POST'])
