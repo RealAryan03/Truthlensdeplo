@@ -20,9 +20,18 @@ import pickle
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
+
+def get_database_uri():
+    database_url = (os.getenv("DATABASE_URL") or "").strip()
+    if not database_url:
+        return "sqlite:///users.db"
+    if database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql://", 1)
+    return database_url
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = (os.getenv('SECRET_KEY') or secrets.token_hex(32)).strip()
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
