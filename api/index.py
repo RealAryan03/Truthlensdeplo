@@ -48,7 +48,7 @@ def get_database_uri():
         return "sqlite:////tmp/users.db"
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
-    if "supabase.co" in database_url and "sslmode=" not in database_url:
+    if database_url.startswith("postgresql://") and "sslmode=" not in database_url:
         separator = "&" if "?" in database_url else "?"
         database_url = f"{database_url}{separator}sslmode=require"
     return database_url
