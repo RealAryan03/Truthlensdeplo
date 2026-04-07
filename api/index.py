@@ -6,7 +6,6 @@ import ssl
 import re
 import secrets
 import bcrypt
-import sqlite3
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
@@ -58,6 +57,12 @@ app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder
 app.config['SECRET_KEY'] = (os.getenv('SECRET_KEY') or secrets.token_hex(32)).strip()
 app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgresql"):
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 180,
+        "connect_args": {"connect_timeout": 10},
+    }
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = (os.getenv('SESSION_COOKIE_SECURE') or 'false').strip().lower() == 'true'
@@ -137,50 +142,6 @@ CONTACT_RECIPIENT = (os.getenv("CONTACT_RECIPIENT") or "").strip()
 SMTP_EMAIL = (os.getenv("EMAIL") or "").strip()
 SMTP_APP_PASSWORD = (os.getenv("APP_PASSWORD") or "").strip()
 ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or CONTACT_RECIPIENT or SMTP_EMAIL).strip()
-FALLBACK_AUTH_DB = "/tmp/auth_fallback.db"
-
-
-def init_fallback_auth_db():
-    with sqlite3.connect(FALLBACK_AUTH_DB) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL
-            )
-            """
-        )
-        conn.commit()
-
-
-def fallback_get_user(identifier):
-    init_fallback_auth_db()
-    identifier_lc = (identifier or "").strip().lower()
-    with sqlite3.connect(FALLBACK_AUTH_DB) as conn:
-        row = conn.execute(
-            "SELECT id, username, email, password FROM users WHERE lower(username)=? OR lower(email)=?",
-            (identifier_lc, identifier_lc),
-        ).fetchone()
-    return row
-
-
-def fallback_create_user(username, email, password):
-    init_fallback_auth_db()
-    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    try:
-        with sqlite3.connect(FALLBACK_AUTH_DB) as conn:
-            conn.execute(
-                "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-                (username, email, password_hash),
-            )
-            conn.commit()
-        return True, ""
-    except sqlite3.IntegrityError:
-        return False, "Username or email already exists."
-    except Exception as e:
-        return False, str(e)
 
 # Load ML assets lazily
 _MODEL = None
@@ -429,26 +390,13 @@ def login():
             session['username'] = user.username
             return redirect(url_for('home'))
 
-        fallback_user = fallback_get_user(identifier)
-        if fallback_user:
-            _, fb_username, _, fb_password_hash = fallback_user
-            if fb_password_hash.startswith(("$2a$", "$2b$", "$2y$")):
-                try:
-                    if bcrypt.checkpw(password.encode('utf-8'), fb_password_hash.encode('utf-8')):
-                        session['user_id'] = f"local:{fb_username}"
-                        session['username'] = fb_username
-                        return redirect(url_for('home'))
-                except ValueError:
-                    pass
-
-        else:
-            return render_template(
-                "login.html",
-                status_type="error",
-                status_message="Invalid username or password.",
-                form_username=identifier,
-                show_forgot=True
-            )
+        return render_template(
+            "login.html",
+            status_type="error",
+            status_message="Invalid username or password.",
+            form_username=identifier,
+            show_forgot=True
+        )
     return render_template("login.html")
 
 
@@ -595,20 +543,10 @@ def register():
         except SQLAlchemyError as e:
             db.session.rollback()
             app.logger.exception("Registration database error: %s", e)
-            fallback_ok, fallback_error = fallback_create_user(username, email, password)
-            if fallback_ok:
-                return render_template(
-                    "register.html",
-                    status_type="success",
-                    status_message="Registration successful! Redirecting to login...",
-                    form_username="",
-                    form_email="",
-                    redirect_url=url_for('login')
-                )
             return render_template(
                 "register.html",
                 status_type="error",
-                status_message=f"Registration failed due to database issue. Fallback storage also failed: {fallback_error}",
+                status_message="Registration failed due to a database issue. Please try again.",
                 form_username=username,
                 form_email=email,
             ), 503
@@ -660,6 +598,7 @@ def contact():
         is_valid_contact, contact_error = validate_contact_payload(name, sender_email, message)
         if not is_valid_contact:
             return contact_response(False, contact_error, status_code=400, form_data=form_data)
+        email_sent = False
         try:
             contact_record = Contact(email=sender_email, message=message)
             db.session.add(contact_record)
@@ -670,13 +609,16 @@ def contact():
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            app.logger.exception("Contact submission failed: %s", e)
-            return contact_response(
-                False,
-                "Failed to process your message. Please try again.",
-                status_code=500,
-                form_data=form_data,
-            )
+            app.logger.exception("Contact DB save failed, trying email-only fallback: %s", e)
+            email_sent, email_error = send_contact_email(name, sender_email, message)
+            if not email_sent:
+                app.logger.warning("Contact fallback email delivery also failed: %s", email_error)
+                return contact_response(
+                    False,
+                    "Failed to process your message. Please try again.",
+                    status_code=500,
+                    form_data=form_data,
+                )
         if email_sent:
             status_message = "Message sent successfully. We will get back to you soon."
         else:
