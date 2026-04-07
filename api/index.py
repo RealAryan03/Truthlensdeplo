@@ -427,9 +427,10 @@ def forgot_password():
         return auth_response(
             "forgot_password.html",
             True,
-            f"{generic_msg} Enter it on the reset page.",
+            f"{generic_msg} You can now enter the OTP on the reset page.",
             200,
-            {"identifier": ""},
+            {"identifier": email},
+            extra_context={"redirect_url": url_for('reset_password', email=email)},
         )
     return render_template("forgot_password.html")
 
