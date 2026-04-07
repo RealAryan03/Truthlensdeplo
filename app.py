@@ -26,7 +26,10 @@ def get_database_uri():
     if not database_url:
         return "sqlite:///users.db"
     if database_url.startswith("postgres://"):
-        return database_url.replace("postgres://", "postgresql://", 1)
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    if "supabase.co" in database_url and "sslmode=" not in database_url:
+        separator = "&" if "?" in database_url else "?"
+        database_url = f"{database_url}{separator}sslmode=require"
     return database_url
 
 app = Flask(__name__)
@@ -115,21 +118,36 @@ SMTP_EMAIL = (os.getenv("EMAIL") or "").strip()
 SMTP_APP_PASSWORD = (os.getenv("APP_PASSWORD") or "").strip()
 ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or CONTACT_RECIPIENT or SMTP_EMAIL).strip()
 
-# Load ML model + vectorizer
-
-# model = pickle.load(open("model.pkl", "rb"))
-# vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
-
-model = pickle.load(open("model_ml.pkl", "rb"))
-vectorizer = pickle.load(open("vectorizer_ml.pkl", "rb"))
+# Load ML assets lazily to reduce Render startup failures and memory spikes.
+_MODEL = None
+_VECTORIZER = None
+_NLP = None
 
 
-# Load spaCy model
-nlp = spacy.load("en_core_web_sm")
+def get_ml_assets():
+    global _MODEL, _VECTORIZER
+    if _MODEL is None or _VECTORIZER is None:
+        _MODEL = pickle.load(open("model_ml.pkl", "rb"))
+        _VECTORIZER = pickle.load(open("vectorizer_ml.pkl", "rb"))
+    return _MODEL, _VECTORIZER
+
+
+def get_nlp_model():
+    global _NLP
+    if _NLP is None:
+        try:
+            _NLP = spacy.load("en_core_web_sm")
+        except Exception:
+            # Fallback tokenizer if model download fails in constrained builds.
+            _NLP = spacy.blank("en")
+            if "sentencizer" not in _NLP.pipe_names:
+                _NLP.add_pipe("sentencizer")
+    return _NLP
 
 
 # ---------------- NLP ----------------
 def extract_main_sentences(text, n=3):
+    nlp = get_nlp_model()
     doc = nlp(text)
     sentences = list(doc.sents)
 
@@ -650,9 +668,18 @@ def predict():
     article = request.form['article']
 
     # -------- ML Prediction (0.4 weight) --------
-    article_vec = vectorizer.transform([article])
-    ml_score = model.predict_proba(article_vec)[0][1]  # 0-1
-    ml_score_percent = ml_score * 100
+    try:
+        model, vectorizer = get_ml_assets()
+        article_vec = vectorizer.transform([article])
+        ml_score = model.predict_proba(article_vec)[0][1]  # 0-1
+        ml_score_percent = ml_score * 100
+    except Exception as e:
+        app.logger.exception("ML assets could not be loaded: %s", e)
+        return render_template(
+            "index.html",
+            status_type="error",
+            status_message="Prediction service is temporarily unavailable. Please try again in a minute.",
+        )
 
     # -------- BERT Prediction (0.5 weight) --------
     bert_score = get_bert_score(article)  # 0-1
