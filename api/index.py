@@ -6,6 +6,7 @@ import ssl
 import re
 import secrets
 import bcrypt
+import sqlite3
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
@@ -136,6 +137,50 @@ CONTACT_RECIPIENT = (os.getenv("CONTACT_RECIPIENT") or "").strip()
 SMTP_EMAIL = (os.getenv("EMAIL") or "").strip()
 SMTP_APP_PASSWORD = (os.getenv("APP_PASSWORD") or "").strip()
 ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or CONTACT_RECIPIENT or SMTP_EMAIL).strip()
+FALLBACK_AUTH_DB = "/tmp/auth_fallback.db"
+
+
+def init_fallback_auth_db():
+    with sqlite3.connect(FALLBACK_AUTH_DB) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+
+
+def fallback_get_user(identifier):
+    init_fallback_auth_db()
+    identifier_lc = (identifier or "").strip().lower()
+    with sqlite3.connect(FALLBACK_AUTH_DB) as conn:
+        row = conn.execute(
+            "SELECT id, username, email, password FROM users WHERE lower(username)=? OR lower(email)=?",
+            (identifier_lc, identifier_lc),
+        ).fetchone()
+    return row
+
+
+def fallback_create_user(username, email, password):
+    init_fallback_auth_db()
+    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    try:
+        with sqlite3.connect(FALLBACK_AUTH_DB) as conn:
+            conn.execute(
+                "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+                (username, email, password_hash),
+            )
+            conn.commit()
+        return True, ""
+    except sqlite3.IntegrityError:
+        return False, "Username or email already exists."
+    except Exception as e:
+        return False, str(e)
 
 # Load ML assets lazily
 _MODEL = None
@@ -370,16 +415,32 @@ def login():
                 status_type="error",
                 status_message="Username and password are required."
             )
-
         identifier_lc = identifier.lower()
-        user = User.query.filter(
-            or_(func.lower(User.username) == identifier_lc, func.lower(User.email) == identifier_lc)
-        ).first()
+        user = None
+        try:
+            user = User.query.filter(
+                or_(func.lower(User.username) == identifier_lc, func.lower(User.email) == identifier_lc)
+            ).first()
+        except SQLAlchemyError as e:
+            app.logger.warning("Primary DB login query failed, trying local fallback: %s", e)
 
         if user and user.check_password(password):
             session['user_id'] = user.id
             session['username'] = user.username
             return redirect(url_for('home'))
+
+        fallback_user = fallback_get_user(identifier)
+        if fallback_user:
+            _, fb_username, _, fb_password_hash = fallback_user
+            if fb_password_hash.startswith(("$2a$", "$2b$", "$2y$")):
+                try:
+                    if bcrypt.checkpw(password.encode('utf-8'), fb_password_hash.encode('utf-8')):
+                        session['user_id'] = f"local:{fb_username}"
+                        session['username'] = fb_username
+                        return redirect(url_for('home'))
+                except ValueError:
+                    pass
+
         else:
             return render_template(
                 "login.html",
@@ -534,10 +595,20 @@ def register():
         except SQLAlchemyError as e:
             db.session.rollback()
             app.logger.exception("Registration database error: %s", e)
+            fallback_ok, fallback_error = fallback_create_user(username, email, password)
+            if fallback_ok:
+                return render_template(
+                    "register.html",
+                    status_type="success",
+                    status_message="Registration successful! Redirecting to login...",
+                    form_username="",
+                    form_email="",
+                    redirect_url=url_for('login')
+                )
             return render_template(
                 "register.html",
                 status_type="error",
-                status_message="Registration failed due to a database issue. If this persists on Vercel, use sqlite fallback or verify DATABASE_URL + sslmode.",
+                status_message=f"Registration failed due to database issue. Fallback storage also failed: {fallback_error}",
                 form_username=username,
                 form_email=email,
             ), 503
