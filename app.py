@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, url_for
+from flask import Flask, render_template, request, redirect, session, url_for, jsonify
 import requests
 import spacy
 import os
@@ -6,14 +6,14 @@ import smtplib
 import ssl
 import re
 import secrets
-import hashlib
+import bcrypt
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from flask_cors import CORS
+from sqlalchemy import text, or_, func
 from werkzeug.security import generate_password_hash, check_password_hash
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
 from backend.bert_model import get_bert_score
 import pickle
 
@@ -21,9 +21,26 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-change-in-env')
+app.config['SECRET_KEY'] = (os.getenv('SECRET_KEY') or secrets.token_hex(32)).strip()
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = (os.getenv('SESSION_COOKIE_SECURE') or 'false').strip().lower() == 'true'
+
+raw_origins = (os.getenv("FRONTEND_ORIGIN") or "*").strip()
+allowed_origins = "*" if raw_origins == "*" else [o.strip() for o in raw_origins.split(",") if o.strip()]
+API_BASE_URL = (os.getenv("API_BASE_URL") or "").strip().rstrip("/")
+CORS(
+    app,
+    resources={
+        r"/contact": {"origins": allowed_origins},
+        r"/forgot-password": {"origins": allowed_origins},
+        r"/reset-password": {"origins": allowed_origins},
+    },
+    methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 db = SQLAlchemy(app)
 
@@ -33,45 +50,47 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     email = db.Column(db.String(255), unique=True, nullable=True, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    otp = db.Column(db.String(6), nullable=True)
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        self.password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        stored = self.password or ""
+        if stored.startswith("$2a$") or stored.startswith("$2b$") or stored.startswith("$2y$"):
+            try:
+                return bcrypt.checkpw(password.encode('utf-8'), stored.encode('utf-8'))
+            except ValueError:
+                return False
+
+        # Backward compatibility for legacy werkzeug hashes.
+        return check_password_hash(stored, password)
 
 
-class ContactMessage(db.Model):
+class Contact(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    sender_email = db.Column(db.String(255), nullable=True)
+    email = db.Column(db.String(255), nullable=True)
     message = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    email_sent = db.Column(db.Boolean, nullable=False, default=False)
-    email_error = db.Column(db.Text, nullable=True)
-
-
-class PasswordResetToken(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
-    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
-    expires_at = db.Column(db.DateTime, nullable=False)
-    used = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-
-    user = db.relationship('User', backref='password_reset_tokens')
 
 
 # Create database tables
 with app.app_context():
     db.create_all()
 
-    # Backward-compatible schema update for existing SQLite DBs.
+    # Backward-compatible schema updates for existing SQLite DBs.
     user_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)")).fetchall()]
     if "email" not in user_columns:
         db.session.execute(text("ALTER TABLE user ADD COLUMN email VARCHAR(255)"))
-        db.session.commit()
+    if "password" not in user_columns:
+        db.session.execute(text("ALTER TABLE user ADD COLUMN password VARCHAR(255)"))
+    if "otp" not in user_columns:
+        db.session.execute(text("ALTER TABLE user ADD COLUMN otp VARCHAR(6)"))
+
+    # If migrating from old schema, copy password_hash values into password.
+    if "password_hash" in user_columns:
+        db.session.execute(text("UPDATE user SET password = password_hash WHERE password IS NULL"))
+    db.session.commit()
 
 
 
@@ -80,19 +99,12 @@ API_KEY = os.getenv("FACT_CHECK_API_KEY")
 if not API_KEY:
     pass
 
-CONTACT_RECIPIENT = "zackryder38056@gmail.com"
-SMTP_SENDER_EMAIL = (os.getenv("SMTP_SENDER_EMAIL") or "").strip()
-SMTP_SENDER_PASSWORD = (os.getenv("SMTP_SENDER_PASSWORD") or "").strip()
-SMTP_HOST = (os.getenv("SMTP_HOST") or "smtp.gmail.com").strip()
-SMTP_PORT = int((os.getenv("SMTP_PORT") or "465").strip())
-SMTP_USE_TLS = (os.getenv("SMTP_USE_TLS") or "false").strip().lower() == "true"
+EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
-BACKUP_SMTP_SENDER_EMAIL = (os.getenv("BACKUP_SMTP_SENDER_EMAIL") or "").strip()
-BACKUP_SMTP_SENDER_PASSWORD = (os.getenv("BACKUP_SMTP_SENDER_PASSWORD") or "").strip()
-BACKUP_SMTP_HOST = (os.getenv("BACKUP_SMTP_HOST") or SMTP_HOST).strip()
-BACKUP_SMTP_PORT = int((os.getenv("BACKUP_SMTP_PORT") or str(SMTP_PORT)).strip())
-BACKUP_SMTP_USE_TLS = (os.getenv("BACKUP_SMTP_USE_TLS") or str(SMTP_USE_TLS).lower()).strip().lower() == "true"
-RESET_LINK_BASE_URL = (os.getenv("RESET_LINK_BASE_URL") or "").strip().rstrip("/")
+CONTACT_RECIPIENT = (os.getenv("CONTACT_RECIPIENT") or "").strip()
+SMTP_EMAIL = (os.getenv("EMAIL") or "").strip()
+SMTP_APP_PASSWORD = (os.getenv("APP_PASSWORD") or "").strip()
+ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or CONTACT_RECIPIENT or SMTP_EMAIL).strip()
 
 # Load ML model + vectorizer
 
@@ -213,143 +225,117 @@ def generate_explanation(ml_score, bert_score, api_result):
     return explanation
 
 
+def is_valid_email(value):
+    if not value:
+        return False
+    return bool(EMAIL_PATTERN.match(value.strip().lower()))
+
+
+def is_valid_password(value, min_length=6):
+    if not value:
+        return False
+    return len(value.strip()) >= min_length
+
+
+def validate_contact_payload(name, email, message):
+    if not email or not message:
+        return False, "Email and message are required."
+    if not is_valid_email(email):
+        return False, "Please enter a valid email address."
+    if len(name) > 120:
+        return False, "Name is too long."
+    if len(message) < 5 or len(message) > 5000:
+        return False, "Message must be between 5 and 5000 characters."
+    return True, ""
+
+
+def send_email(to_email, subject, body_text, reply_to=None):
+    if not SMTP_EMAIL or not SMTP_APP_PASSWORD:
+        return False, "Missing EMAIL or APP_PASSWORD in environment."
+
+    try:
+        email = EmailMessage()
+        email["Subject"] = subject
+        email["From"] = SMTP_EMAIL
+        email["To"] = to_email
+        if reply_to:
+            email["Reply-To"] = reply_to
+        email.set_content(body_text)
+
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context, timeout=20) as server:
+            server.login(SMTP_EMAIL, SMTP_APP_PASSWORD)
+            server.send_message(email)
+        return True, ""
+    except Exception as e:
+        return False, f"Gmail SMTP send failed: {e}"
+
+
 def send_contact_email(name, sender_email, message):
-    smtp_configs = []
-    if SMTP_SENDER_EMAIL and SMTP_SENDER_PASSWORD:
-        smtp_configs.append({
-            "label": "primary",
-            "host": SMTP_HOST,
-            "port": SMTP_PORT,
-            "use_tls": SMTP_USE_TLS,
-            "sender_email": SMTP_SENDER_EMAIL,
-            "sender_password": SMTP_SENDER_PASSWORD,
-        })
+    if not ADMIN_EMAIL:
+        return False, "Missing admin destination email (ADMIN_EMAIL/CONTACT_RECIPIENT)."
 
-    if BACKUP_SMTP_SENDER_EMAIL and BACKUP_SMTP_SENDER_PASSWORD:
-        smtp_configs.append({
-            "label": "backup",
-            "host": BACKUP_SMTP_HOST,
-            "port": BACKUP_SMTP_PORT,
-            "use_tls": BACKUP_SMTP_USE_TLS,
-            "sender_email": BACKUP_SMTP_SENDER_EMAIL,
-            "sender_password": BACKUP_SMTP_SENDER_PASSWORD,
-        })
-
-    if not smtp_configs:
-        return False, "No SMTP credentials configured. Set primary or backup SMTP credentials in .env"
-
-    last_error = ""
-
-    for cfg in smtp_configs:
-        for attempt in range(1, 4):
-            try:
-                email = EmailMessage()
-                email["Subject"] = f"TruthLens Contact Message from {name}"
-                email["From"] = cfg["sender_email"]
-                email["To"] = CONTACT_RECIPIENT
-                if sender_email:
-                    email["Reply-To"] = sender_email
-
-                email.set_content(
-                    f"New contact form submission\n\n"
-                    f"Name: {name}\n"
-                    f"Email: {sender_email or 'Not provided'}\n\n"
-                    f"Message:\n{message}"
-                )
-
-                context = ssl.create_default_context()
-                if cfg["use_tls"]:
-                    with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
-                        server.starttls(context=context)
-                        server.login(cfg["sender_email"], cfg["sender_password"])
-                        server.send_message(email)
-                else:
-                    with smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=context, timeout=15) as server:
-                        server.login(cfg["sender_email"], cfg["sender_password"])
-                        server.send_message(email)
-                return True, ""
-            except Exception as e:
-                last_error = f"{cfg['label']} SMTP attempt {attempt} failed: {e}"
-
-    return False, f"All SMTP delivery attempts failed. Last error: {last_error}"
+    email_subject = f"TruthLens Contact Message from {name}"
+    email_body = (
+        f"New contact form submission\n\n"
+        f"Name: {name}\n"
+        f"Email: {sender_email or 'Not provided'}\n\n"
+        f"Message:\n{message}"
+    )
+    return send_email(ADMIN_EMAIL, email_subject, email_body, reply_to=sender_email or None)
 
 
-def send_password_reset_email(recipient_email, reset_url):
-    smtp_configs = []
-    if SMTP_SENDER_EMAIL and SMTP_SENDER_PASSWORD:
-        smtp_configs.append({
-            "label": "primary",
-            "host": SMTP_HOST,
-            "port": SMTP_PORT,
-            "use_tls": SMTP_USE_TLS,
-            "sender_email": SMTP_SENDER_EMAIL,
-            "sender_password": SMTP_SENDER_PASSWORD,
-        })
-
-    if BACKUP_SMTP_SENDER_EMAIL and BACKUP_SMTP_SENDER_PASSWORD:
-        smtp_configs.append({
-            "label": "backup",
-            "host": BACKUP_SMTP_HOST,
-            "port": BACKUP_SMTP_PORT,
-            "use_tls": BACKUP_SMTP_USE_TLS,
-            "sender_email": BACKUP_SMTP_SENDER_EMAIL,
-            "sender_password": BACKUP_SMTP_SENDER_PASSWORD,
-        })
-
-    if not smtp_configs:
-        return False, "No SMTP credentials configured."
-
-    last_error = ""
-    for cfg in smtp_configs:
-        for attempt in range(1, 4):
-            try:
-                email = EmailMessage()
-                email["Subject"] = "TruthLens Password Reset"
-                email["From"] = cfg["sender_email"]
-                email["To"] = recipient_email
-                email.set_content(
-                    "We received a password reset request for your TruthLens account.\n\n"
-                    f"Reset link (valid for 30 minutes):\n{reset_url}\n\n"
-                    "If you did not request this reset, you can safely ignore this email."
-                )
-
-                context = ssl.create_default_context()
-                if cfg["use_tls"]:
-                    with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
-                        server.starttls(context=context)
-                        server.login(cfg["sender_email"], cfg["sender_password"])
-                        server.send_message(email)
-                else:
-                    with smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=context, timeout=15) as server:
-                        server.login(cfg["sender_email"], cfg["sender_password"])
-                        server.send_message(email)
-                return True, ""
-            except Exception as e:
-                last_error = f"{cfg['label']} SMTP attempt {attempt} failed: {e}"
-
-    return False, f"All SMTP delivery attempts failed. Last error: {last_error}"
+def send_password_reset_email(recipient_email, otp_code):
+    email_subject = "TruthLens Password Reset OTP"
+    email_body = (
+        "We received a password reset request for your TruthLens account.\n\n"
+        f"Your OTP code (valid for 10 minutes): {otp_code}\n\n"
+        "If you did not request this reset, you can safely ignore this email."
+    )
+    return send_email(recipient_email, email_subject, email_body)
 
 
-def hash_reset_token(raw_token):
-    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+def wants_json_response():
+    accept_header = (request.headers.get("Accept") or "").lower()
+    return request.is_json or "application/json" in accept_header
 
 
-def utc_now():
-    return datetime.now(timezone.utc)
+def contact_response(success, message, status_code=200, form_data=None):
+    if wants_json_response():
+        payload = {"success": success, "message": message}
+        return jsonify(payload), status_code
+
+    form_data = form_data or {}
+    return render_template(
+        "contact.html",
+        status_type="success" if success else "error",
+        status_message=message,
+        form_name=form_data.get("name", ""),
+        form_email=form_data.get("email", ""),
+        form_message=form_data.get("message", ""),
+    ), status_code
 
 
-def normalize_utc(dt_value):
-    if dt_value is None:
-        return None
-    if dt_value.tzinfo is None:
-        return dt_value.replace(tzinfo=timezone.utc)
-    return dt_value.astimezone(timezone.utc)
+def auth_response(template_name, success, message, status_code=200, form_data=None, extra_context=None):
+    if wants_json_response():
+        payload = {"success": success, "message": message}
+        return jsonify(payload), status_code
+
+    form_data = form_data or {}
+    context = {
+        "status_type": "success" if success else "error",
+        "status_message": message,
+        "form_identifier": form_data.get("identifier", ""),
+        "form_otp": form_data.get("otp", ""),
+    }
+    if extra_context:
+        context.update(extra_context)
+    return render_template(template_name, **context), status_code
 
 
-def build_reset_url(raw_token):
-    if RESET_LINK_BASE_URL:
-        return f"{RESET_LINK_BASE_URL}/reset-password/{raw_token}"
-    return url_for('reset_password', token=raw_token, _external=True)
+@app.context_processor
+def inject_frontend_config():
+    return {"api_base_url": API_BASE_URL}
 
 
 # ---------------- ROUTES ----------------
@@ -402,126 +388,103 @@ def login():
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
-        identifier = request.form.get('identifier', '').strip()
+        email = (request.form.get('email') or request.form.get('identifier') or '').strip().lower()
+        if request.is_json:
+            payload = request.get_json(silent=True) or {}
+            email = (payload.get('email') or '').strip().lower()
 
-        if not identifier:
-            return render_template(
-                "forgot_password.html",
-                status_type="error",
-                status_message="Please enter your username or email.",
-                form_identifier=identifier,
-            )
+        form_data = {"identifier": email}
 
-        user = User.query.filter(
-            (User.username == identifier) | (User.email == identifier.lower())
-        ).first()
+        if not email:
+            return auth_response("forgot_password.html", False, "Please enter your email address.", 400, form_data)
+
+        if not is_valid_email(email):
+            return auth_response("forgot_password.html", False, "Please enter a valid email address.", 400, form_data)
+
+        user = User.query.filter(func.lower(User.email) == email).first()
 
         # Keep response generic to avoid username/email enumeration.
-        generic_msg = "If an account with a verified email exists, a reset link has been sent."
+        generic_msg = "If an account with a verified email exists, an OTP has been sent."
 
         if not user or not user.email:
-            return render_template(
-                "forgot_password.html",
-                status_type="success",
-                status_message=generic_msg,
-                form_identifier="",
-            )
+            return auth_response("forgot_password.html", True, generic_msg, 200, {"identifier": ""})
 
-        raw_token = secrets.token_urlsafe(32)
-        token_hash = hash_reset_token(raw_token)
-        reset_entry = PasswordResetToken(
-            user_id=user.id,
-            token_hash=token_hash,
-            expires_at=utc_now() + timedelta(minutes=30),
-            used=False,
-        )
-        db.session.add(reset_entry)
+        otp_code = f"{secrets.randbelow(1000000):06d}"
+        user.otp = otp_code
         db.session.commit()
 
-        reset_url = build_reset_url(raw_token)
-        email_sent, email_error = send_password_reset_email(user.email, reset_url)
+        email_sent, email_error = send_password_reset_email(user.email, otp_code)
 
         if not email_sent:
-            reset_entry.used = True
+            user.otp = None
+            app.logger.warning("Password reset email failed for user_id=%s: %s", user.id, email_error)
             db.session.commit()
 
-        return render_template(
+        return auth_response(
             "forgot_password.html",
-            status_type="success",
-            status_message=generic_msg,
-            form_identifier="",
+            True,
+            f"{generic_msg} Enter it on the reset page.",
+            200,
+            {"identifier": ""},
         )
 
     return render_template("forgot_password.html")
 
 
-@app.route('/reset-password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
-    token_hash = hash_reset_token(token)
-    reset_entry = PasswordResetToken.query.filter_by(token_hash=token_hash, used=False).first()
-    now = utc_now()
-    expires_at = normalize_utc(reset_entry.expires_at) if reset_entry else None
-
-    if not reset_entry or not expires_at or expires_at < now:
-        return render_template(
-            "reset_password.html",
-            status_type="error",
-            status_message="This reset link is invalid or has expired. Please request a new one.",
-            token_valid=False,
-        )
-
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
     if request.method == 'POST':
+        email = (request.form.get('email') or request.form.get('identifier') or '').strip().lower()
+        otp_code = request.form.get('otp', '').strip()
         new_password = request.form.get('new_password', '').strip()
         confirm_password = request.form.get('confirm_password', '').strip()
+        if request.is_json:
+            payload = request.get_json(silent=True) or {}
+            email = (payload.get('email') or '').strip().lower()
+            otp_code = (payload.get('otp') or '').strip()
+            new_password = (payload.get('new_password') or '').strip()
+            confirm_password = (payload.get('confirm_password') or '').strip()
 
-        if not new_password or not confirm_password:
-            return render_template(
-                "reset_password.html",
-                status_type="error",
-                status_message="All fields are required.",
-                token_valid=True,
-                token=token,
-            )
+        form_data = {"identifier": email, "otp": otp_code}
 
-        if len(new_password) < 6:
-            return render_template(
-                "reset_password.html",
-                status_type="error",
-                status_message="Password must be at least 6 characters.",
-                token_valid=True,
-                token=token,
-            )
+        if not email or not otp_code or not new_password or not confirm_password:
+            return auth_response("reset_password.html", False, "All fields are required.", 400, form_data)
+
+        if not is_valid_email(email):
+            return auth_response("reset_password.html", False, "Please enter a valid email address.", 400, form_data)
+
+        if not otp_code.isdigit() or len(otp_code) != 6:
+            return auth_response("reset_password.html", False, "OTP must be a 6-digit code.", 400, form_data)
+
+        if not is_valid_password(new_password):
+            return auth_response("reset_password.html", False, "Password must be at least 6 characters.", 400, form_data)
 
         if new_password != confirm_password:
-            return render_template(
-                "reset_password.html",
-                status_type="error",
-                status_message="Passwords do not match.",
-                token_valid=True,
-                token=token,
-            )
+            return auth_response("reset_password.html", False, "Passwords do not match.", 400, form_data)
 
-        reset_entry.user.set_password(new_password)
-        reset_entry.used = True
+        user = User.query.filter(func.lower(User.email) == email).first()
 
-        # Invalidate any other active reset links for the same account.
-        PasswordResetToken.query.filter(
-            PasswordResetToken.user_id == reset_entry.user_id,
-            PasswordResetToken.used == False,
-            PasswordResetToken.id != reset_entry.id,
-        ).update({"used": True})
+        if not user:
+            return auth_response("reset_password.html", False, "Invalid reset details. Please request a new OTP.", 400, form_data)
+
+        if not user.otp or user.otp != otp_code:
+            return auth_response("reset_password.html", False, "Invalid OTP. Please request a new one.", 400, form_data)
+
+        user.set_password(new_password)
+        user.otp = None
 
         db.session.commit()
 
-        return render_template(
+        return auth_response(
             "reset_password.html",
-            status_type="success",
-            status_message="Password reset successful. Redirecting to login...",
-            token_valid=False,
-            redirect_url=url_for('login')
+            True,
+            "Password reset successful. Redirecting to login...",
+            200,
+            form_data={"identifier": "", "otp": ""},
+            extra_context={"redirect_url": url_for('login')},
         )
 
-    return render_template("reset_password.html", token_valid=True, token=token)
+    return render_template("reset_password.html")
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -551,7 +514,7 @@ def register():
                 form_email=email,
             )
 
-        if len(password) < 6:
+        if not is_valid_password(password):
             return render_template(
                 "register.html",
                 status_type="error",
@@ -618,49 +581,56 @@ def about():
 
 @app.route('/contact', methods=['GET', 'POST'])
 def contact():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    if request.method == 'GET':
+        return render_template("contact.html")
+
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        sender_email = request.form.get('email', '').strip()
-        message = request.form.get('message', '').strip()
+        payload = request.get_json(silent=True) if request.is_json else None
 
-        if not name or not message:
-            return render_template(
-                "contact.html",
-                status_type="error",
-                status_message="Please provide your name and message.",
-                form_name=name,
-                form_email=sender_email,
-                form_message=message,
+        name = ((payload or {}).get('name') or request.form.get('name') or 'Website User').strip()
+        sender_email = ((payload or {}).get('email') or request.form.get('email') or '').strip().lower()
+        message = ((payload or {}).get('message') or request.form.get('message') or '').strip()
+
+        form_data = {"name": name, "email": sender_email, "message": message}
+
+        is_valid_contact, contact_error = validate_contact_payload(name, sender_email, message)
+        if not is_valid_contact:
+            return contact_response(False, contact_error, status_code=400, form_data=form_data)
+
+        try:
+            contact_record = Contact(
+                email=sender_email,
+                message=message,
             )
+            db.session.add(contact_record)
+            db.session.flush()
 
-        contact_record = ContactMessage(
-            name=name,
-            sender_email=sender_email or None,
-            message=message,
-        )
-        db.session.add(contact_record)
+            email_sent, email_error = send_contact_email(name, sender_email, message)
+            if not email_sent:
+                app.logger.warning("Contact email delivery failed for message_id=%s: %s", contact_record.id, email_error)
 
-        email_sent, email_error = send_contact_email(name, sender_email, message)
-        contact_record.email_sent = email_sent
-        contact_record.email_error = email_error or None
-        db.session.commit()
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            app.logger.exception("Contact submission failed: %s", e)
+            return contact_response(
+                False,
+                "Failed to process your message. Please try again.",
+                status_code=500,
+                form_data=form_data,
+            )
 
         if email_sent:
             status_message = "Message sent successfully. We will get back to you soon."
         else:
-            # Keep UX stable for users even if SMTP provider is temporarily unavailable.
-            status_message = "Message received successfully. Our team has been notified and will get back to you soon."
+            status_message = "Message received successfully. We will get back to you soon."
 
-        return render_template(
-            "contact.html",
-            status_type="success",
-            status_message=status_message,
-            form_name="",
-            form_email="",
-            form_message="",
-        )
+        return contact_response(True, status_message, status_code=200, form_data={})
 
-    return render_template("contact.html")
+    return contact_response(False, "Method not allowed.", status_code=405)
 
 
 @app.route('/predict', methods=['POST'])

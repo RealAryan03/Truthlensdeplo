@@ -1,5 +1,6 @@
 // ============ PAGE LOAD & TRANSITIONS ============
 document.addEventListener('DOMContentLoaded', () => {
+    initApiBaseRouting();
     initPageTransitions();
     initFormValidation();
     initScrollAnimations();
@@ -12,6 +13,18 @@ document.addEventListener('DOMContentLoaded', () => {
     initArticleCounter();
     initTooltips();
 });
+
+function initApiBaseRouting() {
+    const apiBase = (window.__API_BASE_URL || '').trim().replace(/\/$/, '');
+    if (!apiBase) return;
+
+    const routedActions = new Set(['/contact', '/forgot-password', '/reset-password', '/predict']);
+    document.querySelectorAll('form[action^="/"]').forEach((form) => {
+        const action = form.getAttribute('action') || '';
+        if (!routedActions.has(action)) return;
+        form.setAttribute('action', `${apiBase}${action}`);
+    });
+}
 
 // Smooth page load animation
 function initPageTransitions() {

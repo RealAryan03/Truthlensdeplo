@@ -9,6 +9,9 @@
     <link rel="shortcut icon" href="{{ url_for('static', filename='images/truthlens-logo.svg') }}">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        window.__API_BASE_URL = "{{ api_base_url|default('') }}";
+    </script>
     <script defer src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
 <body>
