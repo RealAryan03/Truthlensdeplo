@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
-import requests
 import os
 import smtplib
 import ssl
-import re
 import secrets
 import bcrypt
 from email.message import EmailMessage
@@ -15,19 +13,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import generate_password_hash, check_password_hash
 from pathlib import Path
 import sys
+import re
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-try:
-    import spacy
-except Exception:
-    spacy = None
-
-try:
-    from backend.bert_model import get_bert_score
-except Exception:
-    get_bert_score = None
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -134,116 +123,11 @@ def initialize_database_safely():
 
 
 initialize_database_safely()
-
-
-API_KEY = os.getenv("FACT_CHECK_API_KEY")
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 CONTACT_RECIPIENT = (os.getenv("CONTACT_RECIPIENT") or "").strip()
 SMTP_EMAIL = (os.getenv("EMAIL") or "").strip()
 SMTP_APP_PASSWORD = (os.getenv("APP_PASSWORD") or "").strip()
 ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or CONTACT_RECIPIENT or SMTP_EMAIL).strip()
-
-# Load ML assets lazily
-_MODEL = None
-_VECTORIZER = None
-_NLP = None
-
-
-def get_ml_assets():
-    global _MODEL, _VECTORIZER
-    raise RuntimeError("Prediction pipeline disabled on Vercel serverless deployment.")
-
-
-def get_nlp_model():
-    global _NLP
-    if spacy is None:
-        return None
-    if _NLP is None:
-        try:
-            _NLP = spacy.load("en_core_web_sm")
-        except Exception:
-            _NLP = spacy.blank("en")
-            if "sentencizer" not in _NLP.pipe_names:
-                _NLP.add_pipe("sentencizer")
-    return _NLP
-
-
-def extract_main_sentences(text, n=3):
-    nlp = get_nlp_model()
-    if nlp is None:
-        parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", text or "") if p.strip()]
-        return parts[:n]
-    doc = nlp(text)
-    sentences = list(doc.sents)
-    sentence_scores = {}
-    for sent in sentences:
-        score = 0
-        for token in sent:
-            if token.pos_ in ["NOUN", "PROPN", "VERB"]:
-                score += 1
-        sentence_scores[sent.text] = score
-    ranked = sorted(sentence_scores, key=sentence_scores.get, reverse=True)
-    return ranked[:n]
-
-
-def check_fact_api(text):
-    url = "https://factchecktools.googleapis.com/v1alpha1/claims:search"
-    params = {"query": text[:300], "key": API_KEY}
-    try:
-        response = requests.get(url, params=params, timeout=5)
-        data = response.json()
-        if "claims" in data:
-            claim = data["claims"][0]
-            rating = claim["claimReview"][0]["textualRating"]
-            if "false" in rating.lower():
-                return "False"
-            elif "true" in rating.lower():
-                return "True"
-            else:
-                return "Uncertain"
-        return "No Data"
-    except Exception:
-        return "No Data"
-
-
-def final_api_decision(results):
-    if "False" in results:
-        return "False"
-    elif "True" in results:
-        return "True"
-    else:
-        return "No Data"
-
-
-def adjust_score(ml_score, api_result):
-    if api_result == "False":
-        return ml_score - 20
-    elif api_result == "True":
-        return ml_score + 10
-    else:
-        return ml_score
-
-
-def generate_explanation(ml_score, bert_score, api_result):
-    explanation = []
-    if ml_score is not None:
-        if ml_score > 70:
-            explanation.append("The article uses formal and structured language (ML model analysis).")
-        else:
-            explanation.append("The article shows patterns often seen in misleading content (ML model analysis).")
-    if bert_score > 70:
-        explanation.append("DistilBERT model predicts the article is likely authentic.")
-    elif bert_score < 40:
-        explanation.append("DistilBERT model indicates the article might be misleading.")
-    else:
-        explanation.append("DistilBERT model shows moderate confidence; the article may require further verification.")
-    if api_result == "False":
-        explanation.append("Fact-checking sources indicate the claim is false.")
-    elif api_result == "True":
-        explanation.append("Fact-checking sources confirm the claim is true.")
-    else:
-        explanation.append("No verified fact-check data found.")
-    return explanation
 
 
 def is_valid_email(value):
